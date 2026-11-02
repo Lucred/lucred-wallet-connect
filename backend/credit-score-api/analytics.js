@@ -106,6 +106,11 @@ function createAnalytics(bq) {
         "SELECT COUNT(DISTINCT receiver) wallets, ROUND(IFNULL(SUM(amount * (1 - platformFeeBps / 10000 - 0.003)), 0)) netUsd, COUNT(*) payouts FROM `credit_bureau.oss_bounty_events`",
         [{ wallets: 0, netUsd: 0, payouts: 0 }]);
 
+      // USDT0 is a strategic stablecoin on Stellar (XOXNO xLend's #2 reserve) but too new to crack
+      // the top-10 asset list by raw event count — surface its own count so we can pin it as an 11th
+      // entry below. qSafe so a miss just omits it rather than breaking the page.
+      const usdt0 = await qSafe(`SELECT COUNT(*) events FROM ${VIEW} WHERE assetCode = 'USDT0'`, [{ events: 0 }]);
+
       // Live on-chain testnet pool aggregates for the product section.
       const onchain = await onchainProduct();
 
@@ -130,6 +135,14 @@ function createAnalytics(bq) {
         eventsPerDayByProtocol = topNames.map((n) => ({ name: n, series: byName[n] || [] }));
       }
 
+      // Top 10 assets by activity, with USDT0 pinned as an 11th entry when present (and not already
+      // in the top 10) so the breakdown reflects that we track it, even at low volume.
+      const topAssetList = topAssets.map((r) => ({ code: r.code, events: num(r.events) }));
+      const usdt0Events = num(usdt0[0] && usdt0[0].events);
+      if (usdt0Events > 0 && !topAssetList.some((a) => a.code === "USDT0")) {
+        topAssetList.push({ code: "USDT0", events: usdt0Events });
+      }
+
       const k = kpiRows[0];
       cache = {
         computedAt: new Date().toISOString(),
@@ -145,7 +158,7 @@ function createAnalytics(bq) {
         },
         byProtocol: byProtocol.map((r) => ({ name: r.name, events: num(r.events), wallets: num(r.wallets) })),
         byCategory: byCategory.map((r) => ({ name: r.name, events: num(r.events) })),
-        topAssets: topAssets.map((r) => ({ code: r.code, events: num(r.events) })),
+        topAssets: topAssetList,
         eventsPerDay: eventsPerDay.map((r) => ({ day: str(r.day), events: num(r.events) })),
         eventsPerDayByProtocol,
         walletsByMonth: walletsByMonth.map((r) => ({
