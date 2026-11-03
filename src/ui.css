@@ -38,7 +38,13 @@ a{color:var(--brand); text-decoration:none;}
 .muted{color:var(--muted)} .faint{color:var(--faint)} .sm{font-size:13.5px} .tiny{font-size:12.5px}
 .eyebrow{font-size:12px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--brand);}
 
-header{position:sticky; top:env(safe-area-inset-top,0px); z-index:30; background:color-mix(in srgb, var(--paper) 86%, transparent); backdrop-filter:blur(10px); border-bottom:1px solid var(--line);}
+header{position:sticky; top:env(safe-area-inset-top,0px); z-index:30; background:color-mix(in srgb, var(--paper) 86%, transparent); -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px); border-bottom:1px solid var(--line);}
+/* Without backdrop-filter (notably older iOS Safari before the -webkit- prefix landed, and when
+   blur is disabled) the 86% bar is see-through and page content bleeds through it while scrolling —
+   give those browsers a fully opaque header so the sticky bar stays solid. */
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  header{background:var(--paper);}
+}
 .bar{display:flex; align-items:center; gap:10px; padding-block:12px;}
 .logo{font-family:var(--font-d); font-weight:800; font-size:20px; letter-spacing:-.02em; display:flex; align-items:center; gap:8px; flex:none;}
 .logo .brandmark{width:26px; height:26px; flex:none; display:block;}
