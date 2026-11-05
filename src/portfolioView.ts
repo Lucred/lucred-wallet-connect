@@ -169,18 +169,19 @@ function render(p: Portfolio) {
 
 let requestId = 0;
 
-// Show the credit-product CTA (on the score + holdings + credit-line cards) only when the wallet
-// actually holds a transferable, priced DeFindex position; point them at the /credit product home.
-function setBorrowCta(_address: string, portfolio: Portfolio | null) {
-  const has = !!portfolio && portfolio.positions.some(
-    (p) => p.protocol === "defindex" && p.transferable === true && (p.usdValue ?? 0) >= 0.01
-  );
+// Show the credit-product CTA (score / holdings / credit-line cards) for ANY scored wallet — it
+// points at the /credit product home. Visibility is gated only on having a scored address, not on
+// holding a DeFindex position: the product offers score-based credit lines, collateral borrowing
+// and lending-to-earn, which apply regardless of what the wallet currently holds. (loadPortfolio
+// runs on every successful score, so the CTA appears as soon as a wallet is scored.)
+function setBorrowCta(address: string, _portfolio: Portfolio | null) {
+  const show = address.length > 0;
   const href = `/credit/`;
   for (const id of ["borrow-cta-score", "borrow-cta-holdings", "borrow-cta-creditline"]) {
     const link = document.getElementById(id) as HTMLAnchorElement | null;
     if (!link) continue;
     link.href = href;
-    link.classList.toggle("hidden", !has);
+    link.classList.toggle("hidden", !show);
   }
 }
 
