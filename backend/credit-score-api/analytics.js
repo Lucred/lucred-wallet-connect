@@ -111,6 +111,12 @@ function createAnalytics(bq) {
       // entry below. qSafe so a miss just omits it rather than breaking the page.
       const usdt0 = await qSafe(`SELECT COUNT(*) events FROM ${VIEW} WHERE assetCode = 'USDT0'`, [{ events: 0 }]);
 
+      // USDY (Ondo's yield-bearing short-Treasury RWA — the largest freely-transferable RWA on
+      // Stellar, ~4,100 holders indexed) is tagged by protocol, not assetCode: its events carry a
+      // null assetCode, so it never reaches the assetCode-keyed top list. Count it by protocolName
+      // and pin it below, same idea as USDT0. qSafe so a miss just omits it.
+      const usdy = await qSafe(`SELECT COUNT(*) events FROM ${VIEW} WHERE protocolName = 'ondo_usdy'`, [{ events: 0 }]);
+
       // Live on-chain testnet pool aggregates for the product section.
       const onchain = await onchainProduct();
 
@@ -135,12 +141,16 @@ function createAnalytics(bq) {
         eventsPerDayByProtocol = topNames.map((n) => ({ name: n, series: byName[n] || [] }));
       }
 
-      // Top 10 assets by activity, with USDT0 pinned as an 11th entry when present (and not already
-      // in the top 10) so the breakdown reflects that we track it, even at low volume.
+      // Top 10 assets by activity, with USDT0 and USDY pinned as extra entries when present (and not
+      // already in the top 10) so the breakdown reflects that we track them, even at lower volume.
       const topAssetList = topAssets.map((r) => ({ code: r.code, events: num(r.events) }));
       const usdt0Events = num(usdt0[0] && usdt0[0].events);
       if (usdt0Events > 0 && !topAssetList.some((a) => a.code === "USDT0")) {
         topAssetList.push({ code: "USDT0", events: usdt0Events });
+      }
+      const usdyEvents = num(usdy[0] && usdy[0].events);
+      if (usdyEvents > 0 && !topAssetList.some((a) => a.code === "USDY")) {
+        topAssetList.push({ code: "USDY", events: usdyEvents });
       }
 
       const k = kpiRows[0];
