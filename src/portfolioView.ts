@@ -169,13 +169,13 @@ function render(p: Portfolio) {
 
 let requestId = 0;
 
-// Show the "Borrow USDC against your DeFindex position" links (on the score + holdings cards) only
-// when the wallet actually holds a transferable, priced DeFindex position; point them at the borrow page.
-function setBorrowCta(address: string, portfolio: Portfolio | null) {
+// Show the credit-product CTA (on the score + holdings + credit-line cards) only when the wallet
+// actually holds a transferable, priced DeFindex position; point them at the /credit product home.
+function setBorrowCta(_address: string, portfolio: Portfolio | null) {
   const has = !!portfolio && portfolio.positions.some(
     (p) => p.protocol === "defindex" && p.transferable === true && (p.usdValue ?? 0) >= 0.01
   );
-  const href = `/borrow.html?wallet=${encodeURIComponent(address)}`;
+  const href = `/credit/`;
   for (const id of ["borrow-cta-score", "borrow-cta-holdings", "borrow-cta-creditline"]) {
     const link = document.getElementById(id) as HTMLAnchorElement | null;
     if (!link) continue;
