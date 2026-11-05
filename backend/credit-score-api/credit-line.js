@@ -24,7 +24,7 @@ const POLICY = {
     incentive:{ label: "Reward tokens",         haircut: 0.60 },   // AQUA, BLND
     curated:  { label: "Other priced tokens",   haircut: 0.70 }    // priced only via stellar.expert's list
   },
-  verifiedClassByTicker: { USDC: "stable", PYUSD: "stable", EURC: "stableFx", CETES: "rwa", USTRY: "rwa", TESOURO: "rwa", XLM: "major", AQUA: "incentive", BLND: "incentive" },
+  verifiedClassByTicker: { USDC: "stable", PYUSD: "stable", EURC: "stableFx", CETES: "rwa", USTRY: "rwa", TESOURO: "rwa", USDY: "rwa", XLM: "major", AQUA: "incentive", BLND: "incentive" },
   lpFactor: 0.90,        // extra factor on pool / vault shares (exit risk, impermanent loss)
   clawbackFactor: 0.50,  // issuer can reclaim the balance
 

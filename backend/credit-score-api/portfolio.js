@@ -42,7 +42,12 @@ const PRICED_TOKENS = {
   CBLV4ATSIWU67CFSQU2NVRKINQIKUZ2ODSZBUJTJ43VJVRSBTZYOPNUR: "USTRY",
   // TESOURO (Brazil treasury bond, Etherfuse): issuer home_domain etherfuse.com, contract id
   // matches stellar.expert's record, Etherfuse live price within 0.1% of its market price.
-  CD6M4R2322BYCY2LNWM74PEBQAQ63SA3DUJLI3L4225U4ZVCLMSCBCIS: "TESOURO"
+  CD6M4R2322BYCY2LNWM74PEBQAQ63SA3DUJLI3L4225U4ZVCLMSCBCIS: "TESOURO",
+  // Ondo USDY (yield-bearing short-Treasury wrapper): asset USDY:GAJMPX5N..., SAC id matches;
+  // freely transferable (issuer auth_required=false), clawback-enabled (flag reported separately).
+  // Largest freely-transferable RWA on Stellar (~$535M, 4,118 holders indexed). Needs the USDY row
+  // in asset_prices priced at NAV (yield-bearing, > $1 and rising), not a $1 peg.
+  CB3YA656OYIHU57657I5KGSBRHE5I3OZU4VFC22PYAOANFZHEWNYGAGP: "USDY"
 };
 
 // Everything NOT on the verified list above can still be priced if it is on stellar.expert's
