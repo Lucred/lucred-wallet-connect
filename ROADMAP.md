@@ -62,6 +62,17 @@ developer-surface work ahead. Items are marked **[done]**, **[in flight]**, or
 - [ ] **[planned] Privy embedded-wallet onboarding.** Email/social-login smart wallets (gasless)
       via Privy alongside Stellar Wallets Kit, so non-crypto-native users onboard and draw a line
       without seed phrases. Testnet first (onboard + draw), then live with DeFindex on mainnet.
+- [ ] **[planned] Tokenized-RWA collateral.** Accept freely-transferable tokenized real-world
+      assets — tokenized T-bills / money-market funds and tokenized gold — as collateral for a USDC
+      line via the collateral engine's existing `rwa` class. Add a **transferability gate**: many
+      tokenized RWAs are permissioned / whitelisted assets a pool cannot custody, so detect that
+      (classic `auth_required`, or a native-token permission manager) and accept only freely
+      transferable ones. Price each via the two-step `PRICED_TOKENS` + `asset_prices`, sub-tier the
+      haircut by RWA type (T-bills tight, gold wider, trade-finance / private-credit excluded), and
+      keep LTV conservative to absorb RWA redemption lag (no fire-sale liquidation; an
+      auction-on-liquidation layer can come later). Etherfuse T-bills are already indexed and in the
+      `rwa` class; Ondo USDY is the largest freely-transferable asset to add next. Holding RWAs
+      should also lift the credit score independent of borrowing.
 
 ## Scoring & data expansion
 
