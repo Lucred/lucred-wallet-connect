@@ -538,11 +538,42 @@ let assetPriceMap = {};
 let vaultAssetMap = {};
 let tokenPriceMap = {}; // contractId -> {usdRate, volume7dUsd, updatedAt}, from credit_bureau.token_prices
 
+// Live NAV override for yield-bearing RWAs whose asset_prices row would otherwise drift between the
+// 6h cron updates (e.g. Ondo USDY, which accrues yield so its NAV rises daily). The asset_prices row
+// stays the seed/fallback; on each reference refresh we pull the live NAV from a public feed and
+// override just the rate. Non-fatal: any failure keeps the stored value.
+const LIVE_RWA_PRICE_IDS = { USDY: "ondo-us-dollar-yield" }; // ticker -> CoinGecko id
+
+async function fetchLiveRwaPrices() {
+  const ids = Object.values(LIVE_RWA_PRICE_IDS).join(",");
+  if (!ids) return {};
+  const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd`, { signal: AbortSignal.timeout(8000) });
+  if (!res.ok) throw new Error("coingecko HTTP " + res.status);
+  const j = await res.json();
+  const out = {};
+  for (const [ticker, id] of Object.entries(LIVE_RWA_PRICE_IDS)) {
+    const p = j[id] && j[id].usd;
+    if (typeof p === "number" && p > 0) out[ticker] = p;
+  }
+  return out;
+}
+
 async function refreshReferenceData() {
   try {
     const [priceRows] = await bq.query("SELECT assetCode, usdRate, isStable, isResearched FROM `credit_bureau.asset_prices`");
     const newPriceMap = {};
     for (const r of priceRows) newPriceMap[r.assetCode] = { usdRate: r.usdRate, isStable: r.isStable, isResearched: r.isResearched };
+    // Override yield-bearing RWA rates with their live NAV so they don't go stale between cron runs.
+    try {
+      const live = await fetchLiveRwaPrices();
+      for (const [ticker, usd] of Object.entries(live)) {
+        if (newPriceMap[ticker]) newPriceMap[ticker].usdRate = usd;
+        else newPriceMap[ticker] = { usdRate: usd, isStable: false, isResearched: true };
+      }
+      if (Object.keys(live).length) console.log("Live RWA NAVs: " + Object.entries(live).map(([k, v]) => `${k}=${v}`).join(", "));
+    } catch (err) {
+      console.error("Live RWA price refresh failed, keeping asset_prices values:", err.message);
+    }
     assetPriceMap = newPriceMap;
 
     const [vaultRows] = await bq.query("SELECT vaultContractId, assetCode FROM `credit_bureau.vault_assets`");
