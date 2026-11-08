@@ -48,3 +48,9 @@ Netlify or Cloudflare Pages work identically (build command `npm run build`, out
 
 - The **connect + sign** path only supports G-addresses (classic accounts) for now — Soroban smart-wallet (C-address) ownership proof isn't supported, since stellar-sdk's SEP-10-style tooling doesn't cover contract-account signing challenges yet (see the Pattern 1/2 smart-account identity notes in the main indexer project). The **paste** path accepts both G and C addresses since there's no signature to verify either way.
 - No persistence — this app doesn't store anything; it's a pure connect/paste → verify (if applicable) → look-up flow against the already-public score API. Linking a wallet to a real LCRD *account* (with KYC tiers, blended scoring) is separate, larger work tracked elsewhere.
+
+## License
+
+Licensed under the Apache License, Version 2.0 — see [LICENSE](LICENSE).
+
+Copyright 2026 Lucred.
