@@ -6,6 +6,8 @@ import { loadPortfolio, resetPortfolio } from "./portfolioView";
 import { loadCreditLine, resetCreditLine, setWaitlistWallet } from "./creditLineView";
 
 const STELLAR_ADDRESS_PATTERN = /^[GC][A-Z2-7]{55}$/;
+// SEP-0002 federation name, e.g. jack*useveilapp.xyz — resolved to a G-account server-side by the score API.
+const FEDERATION_PATTERN = /^[^*\s@]+\*(?:[a-z0-9-]+\.)+[a-z]{2,}$/i;
 
 const connectStage = document.getElementById("connect-stage")!;
 const connectedStage = document.getElementById("connected-stage")!;
@@ -225,12 +227,16 @@ connectBtn.addEventListener("click", async () => {
 pasteForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   clearError();
-  const address = pasteInput.value.trim().toUpperCase();
+  const raw = pasteInput.value.trim();
+  const isAddress = STELLAR_ADDRESS_PATTERN.test(raw.toUpperCase());
+  const isFederation = FEDERATION_PATTERN.test(raw);
 
-  if (!STELLAR_ADDRESS_PATTERN.test(address)) {
-    showError("Enter a valid 56-character Stellar address starting with G or C.");
+  if (!isAddress && !isFederation) {
+    showError("Enter a Stellar address (G… or C…) or a federation name like name*domain.");
     return;
   }
+  // Raw addresses are case-normalised; a federation name is sent as-is and the API resolves it to a G-account.
+  const address = isAddress ? raw.toUpperCase() : raw;
 
   pasteBtn.disabled = true;
   pasteBtn.textContent = "Scoring…";

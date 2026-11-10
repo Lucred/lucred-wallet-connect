@@ -48,13 +48,14 @@
           <div class="divider"><span>or</span></div>
 
           <form id="paste-form" class="paste-form">
-            <label for="paste-input" class="sr-only">Wallet address</label>
+            <label for="paste-input" class="sr-only">Wallet address or federation name</label>
             <input
               id="paste-input"
               type="text"
-              placeholder="Paste a wallet address (G... or C...)"
+              placeholder="Address (G... / C...) or name*domain"
               autocomplete="off"
               spellcheck="false"
+              autocapitalize="none"
             />
             <button type="submit" id="paste-btn" class="btn-secondary">View Score</button>
           </form>

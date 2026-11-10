@@ -727,6 +727,45 @@ async function resolveLinkedGAddress(contractAddress) {
 // contract, but worth knowing if a lookup result ever looks surprising.
 const STELLAR_ADDRESS_RE = /^[GC][A-Z2-7]{55}$/;
 
+// ---- SEP-0002 federation: accept "name*domain" addresses (e.g. jack*useveilapp.xyz) ----
+// Resolve a federation name to a Stellar G-account via the domain's stellar.toml
+// FEDERATION_SERVER. Read-only outbound HTTPS with bounded timeouts. Raw G/C
+// addresses pass straight through. Returns a validated address, or null.
+const FEDERATION_RE = /^[^*\s@]+\*(?:[a-z0-9-]+\.)+[a-z]{2,}$/i;
+
+async function fetchText(url, ms = 8000) {
+  const r = await fetch(url, { redirect: "follow", signal: AbortSignal.timeout(ms) });
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  return r.text();
+}
+
+async function resolveFederation(addr) {
+  const domain = addr.split("*")[1];
+  if (!domain) return null;
+  const toml = await fetchText(`https://${domain}/.well-known/stellar.toml`);
+  const m = toml.match(/^\s*FEDERATION_SERVER\s*=\s*"?([^"\r\n]+?)"?\s*$/im);
+  if (!m) return null;
+  const fed = m[1].trim();
+  if (!/^https:\/\//i.test(fed)) return null; // SEP-2 requires HTTPS
+  const url = `${fed}${fed.includes("?") ? "&" : "?"}q=${encodeURIComponent(addr)}&type=name`;
+  let j;
+  try { j = JSON.parse(await fetchText(url)); } catch { return null; }
+  const acct = String((j && j.account_id) || "").toUpperCase();
+  return STELLAR_ADDRESS_RE.test(acct) ? acct : null;
+}
+
+// Accepts a raw G/C address or a federation name; returns a validated address or null.
+async function resolveWallet(raw) {
+  const s = String(raw || "").trim();
+  if (!s) return null;
+  const up = s.toUpperCase();
+  if (STELLAR_ADDRESS_RE.test(up)) return up;
+  if (FEDERATION_RE.test(s)) {
+    try { return await resolveFederation(s); } catch { return null; }
+  }
+  return null;
+}
+
 app.use(express.static("public"));
 
 // ---- /portfolio: current token balances + DeFi positions (see portfolio.js) ----
@@ -753,9 +792,9 @@ const portfolioService = createPortfolioService({
 });
 
 app.get("/portfolio", async (req, res) => {
-  const wallet = (req.query.wallet || "").trim().toUpperCase();
-  if (!STELLAR_ADDRESS_RE.test(wallet)) {
-    return res.status(400).json({ error: "Invalid Stellar address. Expected a 56-character address starting with G (account) or C (contract/smart wallet)." });
+  const wallet = await resolveWallet(req.query.wallet);
+  if (!wallet) {
+    return res.status(400).json({ error: "Invalid Stellar address. Expected a 56-character address starting with G (account) or C (contract/smart wallet), or a federation name (name*domain)." });
   }
   try {
     res.json(await portfolioService.getPortfolio(wallet));
@@ -896,10 +935,10 @@ async function applyIncomeBlend(result, wallet) {
 }
 
 app.get("/score", async (req, res) => {
-  const wallet = (req.query.wallet || "").trim().toUpperCase();
+  const wallet = await resolveWallet(req.query.wallet);
 
-  if (!STELLAR_ADDRESS_RE.test(wallet)) {
-    return res.status(400).json({ error: "Invalid Stellar address. Expected a 56-character address starting with G (account) or C (contract/smart wallet)." });
+  if (!wallet) {
+    return res.status(400).json({ error: "Invalid Stellar address. Expected a 56-character address starting with G (account) or C (contract/smart wallet), or a federation name (name*domain)." });
   }
 
   try {
@@ -916,9 +955,9 @@ app.get("/score", async (req, res) => {
 // Indicative credit line + APR for all three lending models (secured / unsecured / mix),
 // from the wallet's score and its holdings. See credit-line.js for the policy.
 app.get("/credit-line", async (req, res) => {
-  const wallet = (req.query.wallet || "").trim().toUpperCase();
-  if (!STELLAR_ADDRESS_RE.test(wallet)) {
-    return res.status(400).json({ error: "Invalid Stellar address. Expected a 56-character address starting with G (account) or C (contract/smart wallet)." });
+  const wallet = await resolveWallet(req.query.wallet);
+  if (!wallet) {
+    return res.status(400).json({ error: "Invalid Stellar address. Expected a 56-character address starting with G (account) or C (contract/smart wallet), or a federation name (name*domain)." });
   }
   try {
     const [score, portfolio] = await Promise.all([
@@ -949,9 +988,9 @@ const DF_STRUCTURES = new Set(["open_ended", "fixed_term"]);
 
 // GET /df-credit/quote?wallet=&structure=&termDays= -> terms object (public, read-only).
 app.get("/df-credit/quote", async (req, res) => {
-  const wallet = (req.query.wallet || "").trim().toUpperCase();
-  if (!STELLAR_ADDRESS_RE.test(wallet)) {
-    return res.status(400).json({ error: "Invalid Stellar address. Expected a 56-character address starting with G (account) or C (contract/smart wallet)." });
+  const wallet = await resolveWallet(req.query.wallet);
+  if (!wallet) {
+    return res.status(400).json({ error: "Invalid Stellar address. Expected a 56-character address starting with G (account) or C (contract/smart wallet), or a federation name (name*domain)." });
   }
   const structure = DF_STRUCTURES.has(req.query.structure) ? req.query.structure : "open_ended";
   const termDays = req.query.termDays !== undefined ? Number(req.query.termDays) : undefined;
