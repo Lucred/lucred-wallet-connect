@@ -7,15 +7,18 @@ sums `assetCode='USDC'` rows per receiver over 12 months — no code change need
 ## Why this is different from the escrow sources
 GrantFox / Trustless Work pay through **Soroban escrow contracts** (decoded from contract events by the
 in-stream indexer — see `backend/indexer/src/escrowBounty.ts`). **Drips Wave is custodial**: it sends a
-plain **classic Stellar payment** of Circle USDC from a fixed treasury account to each contributor (a `$1`
-test, then the full grant). There is nothing to decode, so this source is just *outbound payments from one
-account* — read straight from **Horizon** (free), not from the BigQuery all-operations dataset (scanning
-that for this window costs ~$28).
+plain **classic Stellar payment** of Circle USDC from a fixed treasury account to each contributor. There
+is nothing to decode, so this source is just *outbound payments from one account* — read straight from
+**Horizon** (free), not from the BigQuery all-operations dataset (scanning that for this window costs ~$28).
 
 ## Source
 - Treasury account: `GC2SFZ2EQ4XIPBQIXYJMQSLVG7NQSHAIGB4PVTBIVTOTJDMNS4NJD4EU` (created ~2026-01-30)
 - Asset: Circle USDC (`GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN`, SAC `CCW67TSZ…SJMI75`)
-- We keep grants `> $1` (the `$1` payments are withdrawal tests, not earnings).
+- We count **every** USDC payment `> $0`. Drips often sends a `$1` test before a grant, but **many
+  contributors withdraw their entire balance as repeated `$1` payments** (we see wallets with 13, 50, even
+  1000+ separate `$1` payouts), so `$1`s are real income — dropping them zeroed out those contributors.
+  The one genuine `$1` test per wallet is counted too: `$1` of noise, immaterial under the weighted 12-mo sum.
+  *(Was `> $1` until 2026-11-12; see backfill note below.)*
 - **Brand: CONFIRMED** (2026-10-21). A Drips Wave grantee confirmed the treasury's payments to
   `GAE6BEVEA6IH4HLTGU3AEGZZWSLNCCWLKD4GLN2XHLXFFNFB24COWUJY` (e.g. tx `8e46c623…`, verified on-chain as
   sent by this treasury) are genuine Drips Wave withdrawals. Also corroborated by Drips' own open-source
@@ -38,6 +41,14 @@ and `bq load`s only the new grants.
 ## Backfill result (2026-10-21)
 18,813 grant rows · 2,435 wallets · ~$776,878 USDC (grants $2–$751, since 2026-02-09). 1,717 of those
 wallets were new to the income table.
+
+## Backfill result ($1-inclusive rule, 2026-11-12)
+After switching from `> $1` to **count-all** (`MIN_AMOUNT = 0.0`), a `--full` re-run added **12,246** rows,
+bringing the table to **31,330 rows · 2,609 wallets · $866,393** (= every treasury USDC payment on Horizon).
+That recovered **+$84,356** of income and **+152 wallets** that previously showed `$0` because their whole
+grant was collected as `$1` payments (e.g. `GAPG6VZX…`, 50 × `$1`, now scores on the income path). The
+re-run also self-healed some `> $1` grants the daily incremental had skipped, so the table is now fully
+consistent with Horizon.
 
 ## Discovering more payment-based income sources
 The treasury was found by cross-referencing Circle-USDC payers against known OSS wallets

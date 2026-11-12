@@ -2,14 +2,18 @@
 """Load Drips Wave grant income into credit_bureau.oss_bounty_events.
 
 Drips Wave pays OSS contributors custodially: a classic Stellar payment of Circle USDC from a fixed
-treasury account to each contributor (a $1 test, then the full grant). This is NOT a Soroban escrow, so
-there are no contract events to decode — the income is just outbound USDC *payments* from one account.
+treasury account to each contributor. Drips often sends a $1 test first, then the grant — but many
+contributors also withdraw their ENTIRE balance as repeated $1 payments (we see wallets with 13, 50,
+even 1000+ separate $1 payouts), so a $1 payment is usually REAL income, not a throwaway test. This is
+NOT a Soroban escrow, so there are no contract events to decode — the income is just outbound USDC
+*payments* from one account.
 
 The cheapest, most complete source for "every payment from one account" is Horizon (free), not a
-BigQuery scan of the all-operations dataset (that costs ~$28 for this window). We page Horizon, keep the
-real grants (drop the $1 tests), and append the new ones to the same oss_bounty_events table the escrow
-sources use — so the existing income scorer (oss-contribution.js: sum USDC by receiver over 12mo) picks
-them up with NO code change.
+BigQuery scan of the all-operations dataset (that costs ~$28 for this window). We page Horizon, count
+every USDC payment > $0 — including $1s, since contributors collect in $1 increments — and append the
+new ones to the same oss_bounty_events table the escrow sources use — so the existing income scorer
+(oss-contribution.js: sum USDC by receiver over 12mo) picks them up with NO code change. (The one
+genuine $1 test per wallet is counted too: $1 of noise, immaterial under the weighted 12-mo sum.)
 
 Idempotent: we read the Drips rows already in the table and skip payments we've already loaded, so
 backfill and the daily incremental run are both safe to re-run.
@@ -32,7 +36,9 @@ HORIZON    = os.environ.get("HORIZON", "https://horizon.stellar.org")
 PROJECT    = os.environ.get("PROJECT", "lucred-715bc")
 TABLE      = "credit_bureau.oss_bounty_events"
 PLATFORM_NAME = "Drips Wave"
-MIN_AMOUNT = 1.0   # drop $1 tests / dust; real grants are > $1
+MIN_AMOUNT = 0.0   # count every USDC payment > 0. $1 payments are REAL income (contributors withdraw
+                   # their whole balance in $1 increments), so we no longer drop them; only true $0/dust
+                   # is skipped. A single genuine $1 test per wallet is counted too (immaterial noise).
 FULL = "--full" in sys.argv
 
 def key(txhash, to, amount):            # dedup key for one grant payment
