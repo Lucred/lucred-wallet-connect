@@ -311,7 +311,7 @@
           on-chain</strong> — even if it has no DeFi activity at all. This is real USDC
           arriving on Stellar from income platforms — just a different kind of on-chain
           activity than the swaps/lending/yield above, which is why the scorer otherwise
-          misses it. It covers two rails today:
+          misses it. It covers three rails today:
         </p>
         <ul>
           <li>
@@ -326,6 +326,16 @@
             by <a href="https://www.drips.network/wave" target="_blank" rel="noopener">Drips Wave</a>,
             which funds contributors to open-source projects. Each grant payment to a
             contributor's wallet is indexed as income.
+          </li>
+          <li>
+            <strong>Hackathon, bounty &amp; grant income</strong> — prizes and grants paid in
+            USDC through
+            <a href="https://www.boundlessfi.xyz" target="_blank" rel="noopener">Boundless</a>,
+            a Stellar platform for hackathons, bounties and grants. When a builder collects a
+            bounty, wins a hackathon prize, or claims a grant milestone, that on-chain payout is
+            indexed as income for their wallet. Recurring bounty work (paid for a deliverable)
+            counts in full; one-off hackathon and grant prizes count at a reduced weight, since a
+            single prize is a weaker signal of steady earning than ongoing paid work.
           </li>
         </ul>
         <p>
@@ -359,7 +369,7 @@
           </tr>
           <tr>
             <td class="term">payouts (12mo)</td>
-            <td>How many separate payouts — escrow milestones or grant payments — the wallet received in the last 12 months. Recurring income reads stronger than a single one-off.</td>
+            <td>How many separate payouts — escrow milestones, grants, or hackathon/bounty prizes — the wallet received in the last 12 months. Recurring income reads stronger than a single one-off.</td>
           </tr>
           <tr>
             <td class="term">$X received (12mo)</td>
