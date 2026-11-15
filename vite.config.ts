@@ -37,6 +37,7 @@ export default defineConfig(({ mode }) => {
           testEscrow: resolve(__dirname, "test-escrow.html"),
           pool: resolve(__dirname, "pool.html"),
           analytics: resolve(__dirname, "analytics.html"),
+          coverage: resolve(__dirname, "coverage.html"),
           ...creditPages,
         },
       },
