@@ -80,7 +80,8 @@ Franklin BENJI, Etherfuse EUROB/KTB, Centrifuge JTRSY/JAAA, WisdomTree gold, Sol
 
 **Already captured upstream (ride Blend pools we index):** Yieldblox, YieldBack.Cash, For Yield
 **Mainnet-live but not worth it:** FxDAO (vault `CCUN4RXU…` dormant since May 2026 + emits no named borrow/repay events), OrbitCDP (its CDP *is* a Blend pool `CAE7QVOM…` we already index)
-**Dead:** Lumen Later (dormant 9mo) · **B2B, not personal income:** Airswift, Indentura, Mercato, Stellar-VaultLink, ClickPesa Debt Fund
+**Dead:** Lumen Later (dormant 9mo)
+**B2B trade-credit / receivables (design-ready, folded into the score when live — see §6):** Airswift, Indentura, Trilobyte · *excluded as corporate financing:* Mercato, Stellar-VaultLink, ClickPesa Debt Fund
 **Not indexable (nothing to score):** wallets (Lobstr, Varial/Freighter, xBull, Hana, Albedo, OneKey, Ledger, Trezor, Beans), anchors/payments (MoneyGram, Yellow Card, Flutterwave, Wave), DEX Lumenswap (low value / not mainnet-confirmed)
 **Flash loans (not a credit signal):** XycLoans
 
@@ -93,3 +94,40 @@ Franklin BENJI, Etherfuse EUROB/KTB, Centrifuge JTRSY/JAAA, WisdomTree gold, Sol
 - **rgstry.xyz** (Stellar Registry) + the contract-level discovery scan (`token_transfers_raw_v2` USDC senders × `oss_bounty_events.receiver`) — catch own-contract protocols.
 
 **To add a mainnet-live protocol:** resolve its contract(s) + event schema (app JS bundle `grep key:"C[A-Z2-7]{55}"`, their repo/docs, or `history_contract_events_v2`), confirm events are named + carry a user address, register in `registry.ts` (+ a `resolve<Protocol>Amount` handler in `xdrParser.ts` if the amount needs a per-protocol field), then redeploy the indexer on the VM (`bash ~/lcrd/deploy-gcp.sh indexer`, gated). Income platforms on TrustlessWork escrow need only a `TRUSTLESS_WORK_PLATFORMS` row in `escrowBounty.ts` once their `roles.platform` account is known.
+
+---
+
+## 6. Design-ready: trade-credit (B2B receivables) signal — Option A
+
+Invoice / receivables-financing protocols (**Airswift, Indentura, Trilobyte**) are **pre-mainnet** (SCF-stage,
+no on-chain footprint yet), so not indexed. When one goes live we **fold the SME's advance→settlement into
+the existing borrow→repay / activity score** (Option A — no separate business-credit product yet). The SME
+wallet is a business entity, so this quietly blends business credit into the personal score; acceptable as an
+interim, revisit as its own dimension (ties to the Arc/EVM USDC product) if volume grows.
+
+**Reference implementation — `Airswiftio/SCF`** (Rust/Soroban — the live product; the 2023 `NFTLoan` TS repo
+was a prototype). Two contracts:
+- **`scf_soroban`** (`TokenizedCertificate` = the receivable as an NFT): `mint(to,id)` (invoice tokenized to
+  the supplier), `redeem(owner,id)` (invoice settled at maturity), `transfer`, `burn`, `split` (fractionalize).
+- **`scf_pool`** (`OfferPool` = financiers): `create(from,amount,offer_id)` (financier funds an offer),
+  `accept(to,offer_id)` (**SME takes the advance**), `expire`.
+
+**Option A mapping into `computeDebtCycles`:**
+| Lifecycle | Event | Maps to |
+|---|---|---|
+| Invoice tokenized | `scf_soroban.mint(to=SME, id)` | cycle context (supplier identity) |
+| Advance drawn | `scf_pool.accept(to=SME, offer_id)` | **borrow** (amount from the matched `create` offer) |
+| Invoice settled | `scf_soroban.redeem(owner, id)` | **repay** — on-time = completed cycle |
+| Default/overdue | `burn` without `redeem`, or past due date | negative |
+
+SME wallet = `mint.to` / `accept.to`.
+
+**Build caveats:**
+1. Correlate `offer_id` ↔ certificate `id` ↔ SME across the pool + certificate contracts (multi-event, like
+   Boundless/Spectra); the amount is on `create`, not `accept`.
+2. Timeliness needs the invoice **due date** (in the certificate's `order_info` storage, not in events) — read
+   via RPC or capture at `accept`.
+
+**Go-live trigger:** watch Airswift (furthest along) on StellarLight; when its `SCF` contracts show a mainnet
+on-chain footprint, resolve the deployed ids, confirm events still match this reference, then register in
+`registry.ts` + add a resolver (`resolveSpectraAmount`-style) + a `computeDebtCycles` branch for the SME cycle.
