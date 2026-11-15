@@ -36,6 +36,24 @@ export const PROTOCOL_REGISTRY: Record<string, ProtocolInfo> = {
   // topic[1] not the payer in the data) — to be written against a real on-chain LCRD event.
   CDW4G2YMN5RIXFTS6CW6XVNKPHJI4WZNAMUNHVKQZBD3G7QT45HELX63: { protocolName: 'lcrd', category: 'lending_pool' }, // TESTNET — swap for mainnet id at launch
 
+  // --- Spectra Finance (interest-rate derivatives / Principal-Token markets) — live mainnet Aug 2026,
+  // Certora-audited (perspectivefi/spectra-core-stellar-public). Users mint Principal Tokens (pt_minted)
+  // against a yield-bearing asset, redeem at maturity (redeem/burn), and claim yield (yield_claimed).
+  // DISTINCT activity from Blend — these are Spectra's own PT contracts, so a wallet using Spectra scores
+  // for DeFi activity/breadth/tenure that our Blend indexing wouldn't see. Category 'yield_derivatives'
+  // = pure ACTIVITY (deliberately NOT income: PT/YT is an investment play, and this category is matched by
+  // none of the income/yield/reward/distribution scorers). 7 PT markets (StellarLight footprint 2026-11-15);
+  // EVM↔Stellar bridge + messenger omitted (admin/cross-chain, not user DeFi activity). NOTE: PT decimals
+  // vary per underlying (USDC-PT 7-dec, deJTRSY-PT 18-dec) so the raw `amount` is approximate — fine here,
+  // the activity path counts events, not USD, and this source is never summed as income.
+  CAAOR5F43GSQZYJESHIVLGZBMHMH3UVJMSBEHFKCUBKOUQSZMQC5UCMK: { protocolName: 'spectra', category: 'yield_derivatives' }, // PT sw-USDC (Blend USDC)
+  CA7KTCVDJXQBC7PB6CANFEBPKAQUGVG6SIZVHGFPQCDX3APPTSROJ6AS: { protocolName: 'spectra', category: 'yield_derivatives' }, // PT sw-EURC (Blend EURC)
+  CD5YZRFQCATFOFZPWE4XDYJZMXAZSW5ROTIAO4D65Q7KTMZIEWGB7H7W: { protocolName: 'spectra', category: 'yield_derivatives' }, // PT earnXLM
+  CCJ43PIDUBSVX4FAI3MJJTFWC3ZXLECARFNJUOUUTKHB5JP32Q75LVPN: { protocolName: 'spectra', category: 'yield_derivatives' }, // PT earnUSDC
+  CDRK5SWZ7DQJ4BZUAZQABPSP7MZS4NO4PPW7LW6CVD5THZDVE63MVLJJ: { protocolName: 'spectra', category: 'yield_derivatives' }, // PT sw-deJTRSY (Centrifuge) 2026/10/16
+  CAAQJ6CN3KWJUG2CTUFUV27IL2BBWEIQKQA27HR7KFFZXROLHN6ELMBI: { protocolName: 'spectra', category: 'yield_derivatives' }, // PT sw-deJTRSY (Centrifuge) 2026/12/15
+  CDHIBKKS53XQAMIDVL7SZLPM2DEHH3OCO7SU6IE3OW65LESYF5K5ABMU: { protocolName: 'spectra', category: 'yield_derivatives' }, // PT sw-deJTRSY (Centrifuge) 2027/03/15
+
   // --- Blend (lending) — #1 by TVL (~$150m) — 12 real pools, fully resolved ---
   // https://docs.blend.capital/mainnet-deployments (factory/backstop);
   // pool addresses are NOT fixed - Blend pools are deployed dynamically, so

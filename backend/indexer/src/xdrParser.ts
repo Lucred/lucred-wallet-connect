@@ -733,6 +733,31 @@ const ALULA_RESULT_FIELDS: Record<string, { resultKey: string; amountField: stri
  * assumed, which is why this is explicit per event type rather than a
  * second generic pass.
  */
+// Spectra Finance: the amount sits DIRECTLY in the event's data map (not a nested result map like Alula).
+// pt_minted/redeem carry `shares`; yield_claimed carries `yield_in_ibt`. Scaled /1e7 as a best-effort —
+// PT decimals vary per underlying (USDC-PT 7-dec, deJTRSY-PT 18-dec), but this is an activity-only source
+// (category 'yield_derivatives'), so the amount is never summed as USD/income and need not be exact.
+const SPECTRA_AMOUNT_FIELDS: Record<string, string> = {
+  pt_minted: 'shares',
+  redeem: 'shares',
+  yield_claimed: 'yield_in_ibt',
+};
+function resolveSpectraAmount(dataVal: xdr.ScVal, eventType: string): number | null {
+  const field = SPECTRA_AMOUNT_FIELDS[eventType];
+  if (!field || dataVal.type !== 'scvMap') return null;
+  for (const entry of dataVal.map ?? []) {
+    if (entry.key.type === 'scvSymbol' && entry.key.sym.toString() === field) {
+      if (!NUMERIC_SCVAL_TYPES.has(entry.val.type)) return null;
+      try {
+        return Number(scValToBigInt(entry.val)) / 10 ** 7;
+      } catch {
+        return null;
+      }
+    }
+  }
+  return null;
+}
+
 function resolveAlulaAmount(dataVal: xdr.ScVal, eventType: string): number | null {
   const config = ALULA_RESULT_FIELDS[eventType];
   if (!config || dataVal.type !== 'scvMap') return null;
@@ -1113,12 +1138,14 @@ export function parseContractEvent(
   const isNormal = protocolInfo.protocolName === 'normal';
   const isDeFindex = protocolInfo.protocolName === 'defindex';
   const isFundable = protocolInfo.protocolName === 'fundable';
+  const isSpectra = protocolInfo.protocolName === 'spectra';
   const alulaAmount = !swap && isAlula ? resolveAlulaAmount(dataVal, eventType) : null;
   const alulaAsset = !swap && isAlula ? resolveAlulaAsset(values, eventType, contractId) : null;
   const normalAmount = !swap && isNormal ? resolveNormalAmount(dataVal, eventType) : null;
   const normalAsset = !swap && isNormal ? resolveNormalAsset(values, remainingTopics, contractId) : null;
   const defindexResult = !swap && isDeFindex ? resolveDeFindexAmountAndShares(dataVal, eventType) : null;
   const fundableAmount = !swap && isFundable ? resolveFundableAmount(dataVal, eventType) : null;
+  const spectraAmount = !swap && isSpectra ? resolveSpectraAmount(dataVal, eventType) : null;
   const { amount, poolShareTokensAfter } = swap
     ? { amount: swap.amount, poolShareTokensAfter: undefined }
     : alulaAmount !== null
@@ -1129,7 +1156,9 @@ export function parseContractEvent(
           ? defindexResult
           : fundableAmount !== null
             ? { amount: fundableAmount, poolShareTokensAfter: undefined }
-            : pickAmount(values, named);
+            : spectraAmount !== null
+              ? { amount: spectraAmount, poolShareTokensAfter: undefined }
+              : pickAmount(values, named);
   const { assetContractId, assetCode } = swap ?? alulaAsset ?? normalAsset ?? resolveAsset(values, protocolInfo, contractId);
 
   return {
