@@ -5,8 +5,11 @@
 # classify (include/exclude + incomeType) instead of being silently skipped by the extractor.
 #
 # Durable complement to the in-stream indexer logging: writes findings to credit_bureau.oss_unknown_platforms.
-# Scans the public crypto-stellar dataset (tw_init over the window) — ~$1.8 per run at 35 days, so run it
-# MONTHLY, not daily. Usage:  DAYS=35 ./report.sh     (needs bq + python3; run on the VM or anywhere with gcloud auth)
+# Scans the public crypto-stellar dataset (tw_init over the window). Cost scales with the window: ~$1.8 at
+# 35 days, ~$0.72 at 14 days. Runs WEEKLY on the VM cron (`5 4 * * 1 DAYS=14`, Mondays 04:05 UTC) — a 14-day
+# look-back with a 7-day cadence overlaps safely because findings dedup into oss_unknown_platforms. Use a
+# larger DAYS for an ad-hoc deeper backfill. Usage:  DAYS=14 ./report.sh     (needs bq + python3; run on the
+# VM or anywhere with gcloud auth)
 set -euo pipefail
 DAYS="${DAYS:-35}"
 PROJECT="${PROJECT:-lucred-715bc}"
