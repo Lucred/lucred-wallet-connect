@@ -189,3 +189,45 @@ tr:last-child td {
 .info-shell footer {
   margin-top: var(--space-2);
 }
+
+/* ── Small screens ───────────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .info-shell {
+    padding: var(--space-8) var(--space-4) 56px;
+    gap: var(--space-4);
+  }
+
+  .info-intro h1 {
+    font-size: 24px;
+  }
+
+  .info-card {
+    padding: var(--space-4);
+    border-radius: 16px;
+  }
+
+  /* Dense tables must wrap, not force horizontal page scroll */
+  table {
+    font-size: var(--text-caption);
+  }
+
+  th,
+  td {
+    padding: 7px var(--space-2);
+  }
+
+  /* The key fix: let protocol/source names wrap so the first column
+     stops locking the table to a width wider than the phone. */
+  td.term {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+}
+
+@media (max-width: 380px) {
+  th,
+  td {
+    padding: 6px 6px;
+  }
+}
