@@ -65,7 +65,7 @@ function renderProduct(p: Analytics["product"]) {
         tile("USDC supplied", usd(p.suppliedUsd || 0), "testnet pool TVL", true),
         tile("Credit advanced", usd(p.advancedUsd || 0), "outstanding on-chain"),
         tile("Active borrowers", full.format(p.activeBorrowers || 0)),
-        tile("In DeFindex vault", usd(p.vaultUsd || 0), "earning yield"),
+        tile("In vault", usd(p.vaultUsd || 0), "earning yield"),
         tile("Waitlist signups", full.format(p.waitlist)),
       ]
     : [
