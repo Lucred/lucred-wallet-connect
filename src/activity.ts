@@ -59,8 +59,8 @@ function metaFor(e: ActivityEvent): Meta {
     case "line_set": return { ...base, glyph: "◆", bg: tint("brand"), fg: "var(--brand)", title: "Line opened", amount: `${n(arr[0])} @ ${pct(Number(arr[3]))}` };
     case "secured": return { ...base, glyph: "◆", bg: tint("brand"), fg: "var(--brand)", title: "Secured line", amount: `${n(arr[0])} @ ${pct(Number(arr[1]))}` };
     case "cycle": return { ...base, glyph: "↗", bg: tint("gold"), fg: "var(--gold)", title: `Cycle ${Number(arr[0])} — limit up`, amount: `${n(arr[2])} @ ${pct(Number(arr[1]))}` };
-    case "invested": return { ...base, glyph: "⇅", bg: "var(--surface-2)", fg: "var(--muted)", title: "Idle USDC → DeFindex vault", amount: `${n(v)} USDC`, userEvent: false };
-    case "divested": return { ...base, glyph: "⇅", bg: "var(--surface-2)", fg: "var(--muted)", title: "DeFindex vault → pool", amount: `${n(v)} USDC`, userEvent: false };
+    case "invested": return { ...base, glyph: "⇅", bg: "var(--surface-2)", fg: "var(--muted)", title: "Idle USDC → vault", amount: `${n(v)} USDC`, userEvent: false };
+    case "divested": return { ...base, glyph: "⇅", bg: "var(--surface-2)", fg: "var(--muted)", title: "vault → pool", amount: `${n(v)} USDC`, userEvent: false };
     case "writeoff": return { ...base, glyph: "!", bg: tint("danger"), fg: "var(--danger)", title: "Written off", amount: `${n(arr[0])} USDC` };
     case "seized": return { ...base, glyph: "!", bg: tint("danger"), fg: "var(--danger)", title: "Collateral seized", amount: "" };
     case "frozen": return { ...base, glyph: "✕", bg: tint("warn"), fg: "var(--warn)", title: "Line frozen", amount: "" };

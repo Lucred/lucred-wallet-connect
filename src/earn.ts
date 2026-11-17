@@ -1,4 +1,4 @@
-// LCRD Earn — deposit USDC to the pool to earn (loan interest + DeFindex vault yield), withdraw anytime.
+// LCRD Earn — deposit USDC to the pool to earn (loan interest + vault yield), withdraw anytime.
 // Wired to the deployed testnet credit-line pool.
 import "./ui.css";
 import "./creditWaitlist"; // shared footer + waitlist on every /credit page
@@ -78,7 +78,7 @@ async function refresh() {
     const investedFrac = total > 0 ? Number(vaultVal) / total : 0;
     const estVault = VAULT_APR * investedFrac;
     $("apy").textContent = `~${(estVault * 100).toFixed(1)}%`;
-    $("chip-vault").textContent = `+ ${(estVault * 100).toFixed(1)}% DeFindex vault`;
+    $("chip-vault").textContent = `+ ${(estVault * 100).toFixed(1)}% vault`;
     $("chip-loan").textContent = "+ borrower interest";
     renderProjection(estVault);
 

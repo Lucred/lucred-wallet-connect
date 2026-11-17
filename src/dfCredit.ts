@@ -1,5 +1,5 @@
 // Client for the dfToken-backed USDC credit feature (see backend/credit-score-api/collateral-engine.js).
-// Off-chain / indicative in this stage: quote the USDC a wallet could draw against its DeFindex vault
+// Off-chain / indicative in this stage: quote the USDC a wallet could draw against its vault
 // position, and record an acceptance. No funds move.
 
 export type DfStructure = "open_ended" | "fixed_term";
