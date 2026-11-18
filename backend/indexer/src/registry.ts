@@ -138,6 +138,25 @@ export const PROTOCOL_REGISTRY: Record<string, ProtocolInfo> = {
   // https://github.com/DefiLlama/DefiLlama-Adapters/blob/main/projects/upshift/index.js
   CCL3WITWFFXIHV2I52ECV5DPIEOFSTU3PBPR53ILPLF2IP5KHECXRUTY: { protocolName: 'gami_upshift', category: 'yield_savings', defaultAssetCode: 'USDC' }, // Gami earnUSDC
   CC6TRAPQD3NK7THUKWPV5SL2JHKQGNXZVB6S6MVYFSLRWAKEFUWZKZ7J: { protocolName: 'gami_upshift', category: 'yield_savings', defaultAssetCode: 'XLM' }, // Gami earnXLM
+  // earnRWA — Gami/Upshift RWA-yield vault, currently uninitialised ($0 TVL, underlying asset
+  // unset on-chain). Registered ahead of activation; no defaultAssetCode so the asset resolves
+  // from its own deposit/withdraw events once it goes live. Verify the underlying at activation.
+  CBCE3JI4D4BQ3DYMUAMGGSGVCJQSYQDNLEMMZBVFUVNLCLNZSSUJQLEQ: { protocolName: 'gami_upshift', category: 'yield_savings' }, // Gami earnRWA (asset TBD)
+  CAI2TYZGVKLQ4CHSMHPHWXZVQFX5SHKJA2Q3WUQVUBI73NGL6SHVAK4L: { protocolName: 'gami_upshift', category: 'yield_savings', defaultAssetCode: 'XLM' }, // Upshift Stellar XLM Vault (empty, not yet active)
+  // NOTE: the two below are staging/test vaults (DefiLlama's upshift adapter filters `staging`
+  // out of TVL). Registered for completeness at the user's request; if they ever transact on
+  // mainnet, consider excluding them from scoring so test flows don't count as real yield.
+  CA2L5OTBHJW7TKVJQQ2JE2IXGEE7BCQ7S73SDJSQIENKOAHJEXBV2VAK: { protocolName: 'gami_upshift', category: 'yield_savings', defaultAssetCode: 'PYUSD' }, // Stellar PYUSD (staging)
+  CCLFVUPRF5UQ7HMRBLYXSMGQNDOCY426YKWMARXNNFOD7J2GZ5FYBBTN: { protocolName: 'gami_upshift', category: 'yield_savings', defaultAssetCode: 'USDC' }, // Test USDC Vault 1
+
+  // --- Sentora (institutional Upshift vaults, curated by Sentora) — surfaced on stellardefihub.com/vaults ---
+  // Same Upshift/August Digital infra as Gami above, but a SEPARATE deployment (Sentora
+  // campaign contracts, audited by Zellic; Upshift vault audited by Halborn). Distinct
+  // protocolName so attribution is clean; Sentora USDC is the largest Stellar yield vault
+  // (~$53.7M, > Gami earnUSDC). Source: August Digital API (chain -3), the feed DefiLlama reads.
+  CALFCZ4TY2CLHDHNJWCZX6JKYGUPV7P3GNQ3UVABXNE5JCV2E774APUM: { protocolName: 'sentora', category: 'yield_savings', defaultAssetCode: 'USDC' }, // Sentora USDC
+  CAY66YC6UHJVYN2UZJSTT3N6EKAXEWGLUDRVFVCUDKXIIF62I4SZFFNJ: { protocolName: 'sentora', category: 'yield_savings', defaultAssetCode: 'XLM' },  // Sentora XLM
+  CDUUKPCCGY5NAGCYWEBXVAGVUEDGICB4QLBQMLJTOE4F62AKOEVQPQTH: { protocolName: 'sentora', category: 'yield_savings', defaultAssetCode: 'PYUSD' }, // Sentora PYUSD
 
   // --- DeFindex (yield aggregator) — #6 by TVL (~$20m) — RESOLVED via live discovery ---
   // Vaults are deployed through a real on-chain factory
@@ -411,6 +430,13 @@ export const PROTOCOL_REGISTRY: Record<string, ProtocolInfo> = {
   CCHXOH2JGL6KBO5VOHR6WD4ZQXI6CFMJ5F65XVSZ6P47Y7KVZSQIPN6J: { protocolName: 'etherfuse', category: 'rwa_treasury' }, // EUROB
   CD6M4R2322BYCY2LNWM74PEBQAQ63SA3DUJLI3L4225U4ZVCLMSCBCIS: { protocolName: 'etherfuse', category: 'rwa_treasury' }, // TESOURO
   CBLV4ATSIWU67CFSQU2NVRKINQIKUZ2ODSZBUJTJ43VJVRSBTZYOPNUR: { protocolName: 'etherfuse', category: 'rwa_treasury' }, // USTRY - verified 200+ live events, matches Horizon's contract_id exactly
+  // Added 2026-11-18 (found by the RWA issuer-asset monitor — same Etherfuse issuer
+  // GCRYUGD5…, SACs computed + SAC-verified, each with live Horizon holders + SAC events).
+  CA4BHPZHZAFLKFRNBIQLEMAYIRWNC7T74ML4L5HTNPZPUZMWUPTSE5Q3: { protocolName: 'etherfuse', category: 'rwa_treasury' }, // MEX (Mexican bond) - 29 holders, 2405 SAC events since Aug 2025
+  CAONMA4XOTBWPTCFXJ5IPKDDXT44KFQJYAM3XYZ3FY2ZGMNW56U25NO4: { protocolName: 'etherfuse', category: 'rwa_treasury' }, // MEXe - 16 holders
+  CCQNEBGX5RJQGNLQ25C67DZLOSNM4NFQBANUS3ASALF2X552BSIQ6XCE: { protocolName: 'etherfuse', category: 'rwa_treasury' }, // GILTS (UK gilts) - 20 holders
+  CBAECV6UVDS6ZKPMC63MUYY4V7Q3KTHR7NLUFGVVGK7K3AQT475QTETP: { protocolName: 'etherfuse', category: 'rwa_treasury' }, // KTB (Korean T-bonds) - 52 holders
+  CBWTA4GBMKOBFLZVHWHYDTV4FCIUYRAE5OLHJQO4CDRDCX52G3OYJ7AB: { protocolName: 'etherfuse', category: 'rwa_treasury' }, // CETESZ - 17 holders (dormant since Aug 2025)
 
   // --- Untangled RWA (~$151k TVL) — resolved, real Soroban vault found ---
   // DefiLlama's `untangled-curator` adapter (projects/untangled-curator/
