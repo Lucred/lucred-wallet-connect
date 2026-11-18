@@ -62,7 +62,7 @@ developer-surface work ahead. Items are marked **[done]**, **[in flight]**, or
 - [ ] **[planned] Privy embedded-wallet onboarding.** Email/social-login smart wallets (gasless)
       via Privy alongside Stellar Wallets Kit, so non-crypto-native users onboard and draw a line
       without seed phrases. Testnet first (onboard + draw), then live with DeFindex on mainnet.
-- [ ] **[planned] Tokenized-RWA collateral.** Accept freely-transferable tokenized real-world
+- [~] **[in flight] Tokenized-RWA collateral.** Accept freely-transferable tokenized real-world
       assets — tokenized T-bills / money-market funds and tokenized gold — as collateral for a USDC
       line via the collateral engine's existing `rwa` class. Add a **transferability gate**: many
       tokenized RWAs are permissioned / whitelisted assets a pool cannot custody, so detect that
@@ -73,6 +73,33 @@ developer-surface work ahead. Items are marked **[done]**, **[in flight]**, or
       auction-on-liquidation layer can come later). Etherfuse T-bills are already indexed and in the
       `rwa` class; Ondo USDY is the largest freely-transferable asset to add next. Holding RWAs
       should also lift the credit score independent of borrowing.
+      **Testnet (done): Etherfuse CETES wired end-to-end.** Real CETES on Stellar testnet (Etherfuse
+      sandbox, issuer home_domain `sand.etherfuse.com`, SAC `CC72F57Y…`, verified on-chain + via
+      `stellar contract id asset`). The engine now accepts **directly-held** registry assets, not just
+      vault shares (`tokenCollateral`/`engineCollateral` in `collateral-engine.js`); `collateral-registry.js`
+      has the testnet CETES entry (`kind:"asset"`, `rwa` class, `clawback:true`, conservative 60%/85%
+      bands); `etherfuse.js` prices it from the public `/lookup/stablebonds` (MXN) × live MXN→USD FX —
+      no `asset_prices` row needed on testnet; `collateral-testnet.js` reads a testnet wallet's CETES
+      and `scripts/cetes-testnet-quote.js` quotes it (verified live: 467.63 CETES → ~$28.79 → ~$10.80
+      lendable at the clawback-adjusted 62% haircut). On-chain pledge harness:
+      `contracts/collateral-escrow/scripts/cetes-escrow-testnet.sh` (allowlists the CETES SAC, then
+      deposit→disburse→repay→close). **Remaining:** fund a borrower via the Etherfuse sandbox onramp
+      (needs a sandbox API key) and run the on-chain pledge; a `/df-credit` testnet-quote endpoint +
+      UI surface; then USTRY/TESOURO/USDY by the same pattern, and mainnet `asset_prices` wiring.
+- [ ] **[exploratory] Tokenized-equity collateral (`rwa_equity`).** Extend RWA collateral to tokenized
+      stocks, index/ETF, and fund shares so holders can borrow a USDC line against them. On-chain
+      equity trading has reached Stellar — 21X (an EU-regulated DLT trading & settlement system) went
+      live on Stellar in May 2026 with a native on-chain central-limit order book settling in
+      stablecoins — which makes tokenized securities a plausible new collateral class. Treated as a
+      **separate sub-class** of `rwa`, not folded into the T-bill tier, because equities carry
+      single-name volatility, intraday price moves, and trading-hours / halt risk the debt RWAs don't:
+      a **wider haircut (~40–50%+)**, a **preference for tokenized index/ETF products over single
+      stocks**, an oracle with a **tight staleness cap** (venue mid or issuer price, since equity marks
+      move intraday), and conservative LTV. Eligibility still runs through the existing transferability
+      gate — only tokenized equities a pool can actually custody and liquidate qualify — and the
+      applicable regulatory treatment of securities-backed credit is to be confirmed per market before
+      build. Near-term, holding tokenized equities can lift the **credit score** independent of
+      borrowing (same as holding tokenized T-bills), which needs none of the custody/liquidation work.
 
 ## Scoring & data expansion
 
@@ -90,9 +117,42 @@ developer-surface work ahead. Items are marked **[done]**, **[in flight]**, or
       **B2B payment history** (who pays on time, how much, how often) — maps directly onto the
       off-chain engine. Next step: when off-chain underwriting is built, scope a pilot for how the
       partner's reconciled payment data feeds the cash-flow sub-score.
+- [ ] **[design-ready] On-chain trade-credit (B2B receivables) signal.** Invoice-financing protocols
+      (Airswift, Indentura, Trilobyte) are pre-mainnet; when one goes live we fold the SME's
+      advance→settlement into the existing borrow→repay score (Option A, no separate business-credit
+      product yet). Full design — the `Airswiftio/SCF` reference contracts/events, the
+      `computeDebtCycles` mapping (`scf_pool.accept`=borrow, `scf_soroban.redeem`=repay, SME=`accept.to`),
+      the correlation/due-date/entity-blend caveats, and the StellarLight go-live trigger — is written
+      up in `backend/indexer/COVERAGE.md` §6.
 - [ ] **[planned] Outcome instrumentation — loan performance by tier.** A loan-performance
       pipeline keyed by score tier (documented schema + dashboard queries), feeding repayment
       outcomes back into scoring.
+- [~] **[in progress] Payment-based income sources + LCRD repayment feedback.**
+      - DONE (2026-11-12): Drips Wave now counts `$1` incremental withdrawals — contributors who
+        collect a whole grant as repeated `$1` payments were scoring `$0`. Loader generalized to a
+        payer registry (`ops/drips-income/load-drips-income.py`).
+      - DONE (2026-11-14): **HackMeridian** grants (`GC4MRJZW…`) added as `incomeType=event_grant`,
+        memo-scoped to grant payments, counted at **0.35** in `oss-contribution.js` (one-off
+        travel/event grants are a weaker creditworthiness signal than sustained income). "Cheese Pay"
+        (`GBOGVS7Q…`) investigated and **excluded** — it's a consumer USDC wallet, not income.
+      - READY, dormant until mainnet: **LCRD's own credit-line pool feeds repayment into the LCRD
+        score.** Pool registered in `backend/indexer/src/registry.ts`; scorer `computeDebtCycles` has
+        an `lcrd` branch so borrow→repay builds the repayment-speed / completed-loans signal.
+        PENDING: an `lcrd` event resolver in `xdrParser.ts` (write against a real on-chain
+        borrowed/repaid event — `payer` sits in the `repaid` data, borrower is `topic[1]`), and swap
+        the testnet pool id for the mainnet id at launch. Scoring reads mainnet, so this is inert
+        until the pool is on mainnet.
+- [ ] **[planned] Sybil / cluster detection — common-funding-source signal.** The score floor is
+      cheap to mint (one borrow→repay cycle takes a new wallet 0 → ~67, bottom of tier A) but
+      deliberately inert: unsecured and score+collateral credit are gated on **tier A/B *and*
+      tenure ≥ 11 pts ≈ 90 days** (`notEstablishedReason`, `credit-line.js`), which a fresh wallet
+      can't fake, so a gamed 67 unlocks only self-collateralized secured credit (zero protocol
+      loss). The residual vector is **patient Sybil** — many wallets, each aged 90 days with thin
+      real activity, then drawing the small unsecured starter ($100 tier A) to default. Defense:
+      flag wallet clusters sharing a common funding source / creation pattern. Cheap because events
+      are already clustered by `userAddress` — add a creator/first-funder trace, a cluster score,
+      and treat clustered wallets as one exposure for unsecured limits. Pairs with outcome
+      instrumentation (clusters should show worse repayment) and the score-integrity note below.
 - [ ] **[planned] Cross-chain collateral & USDC (exploratory).** Assets bridged via LayerZero as
       eligible collateral, Circle CCTP for native cross-chain USDC (deferred to mainnet), and NEAR
       Intents for intent-based execution. Promote if prioritized.
@@ -149,6 +209,17 @@ API is a candidate data source/partner.
       repo + README + reproducible build.
 - [ ] **[planned] STRIDE threat model + on-chain monitoring.** Both docs in the public repo
       per Stellar templates; extend the live fraud monitor so alerts fire on a simulated attack.
+- [ ] **[planned] Score-integrity / gaming-resistance note (public + FAQ).** A short write-up of
+      *why the score resists gaming*, for partners, the SCF panel, and the docs site. Core argument:
+      the score is a two-layer design — the cheap-to-mint 67 floor opens the ecosystem but underwrites
+      nothing (only self-collateralized secured credit); the signals that gate real money and move a
+      wallet into the 80s/90s can't be bought in a day — **tenure** (90-day calendar gate),
+      **consistency** (distinct active days), **repeat cycles** (2+ for full trust; score capped at 82
+      until the second loan), and **identity-bound income** (OSS/escrow payouts, the explicit
+      "anti-self-funding signal" in `oss-contribution.js`). Same reasoning is why a testnet/live
+      adoption metric must count **real external, non-team wallets** — a synthetic-wallet number is
+      worthless for exactly the reason the score is hard to game. Dovetails with the STRIDE threat
+      model and the Sybil/cluster item above.
 - [ ] **[planned] End-to-end test suite + CI.** CI green + coverage report in the public repo.
 - [ ] **[planned] Audited mainnet deployment (pool + escrow).** Third-party audit; contracts live
       on mainnet with addresses on Stellar Expert and the audit report linked.
