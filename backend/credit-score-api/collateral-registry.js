@@ -8,14 +8,19 @@
 // testnet now; fill in `mainnet` at launch (same shape) and set COLLATERAL_NETWORK=mainnet. Nothing
 // else changes.
 //
-// Each entry (keyed by share-token contract id):
-//   protocol           "defindex" | "aquarius" | "soroswap" | "blend" | ...
-//   kind               "vault" | "amm_lp" | "lending"
+// Each entry (keyed by the contract id the wallet actually holds — a vault share-token, or the
+// token's own SAC for a directly-held asset):
+//   protocol           "defindex" | "aquarius" | "soroswap" | "blend" | "etherfuse" | ...
+//   kind               "vault" | "amm_lp" | "lending"  (share-token collateral, valued via positions)
+//                      | "asset" | "token"             (directly-held collateral, valued via tokens)
 //   label, symbol      display name + ticker for the UI
 //   underlyingClass    a key in POLICY.collateralClasses (drives the haircut): stable|stableFx|rwa|major|incentive|curated
 //   advanceBps         max loan as a share of market value (e.g. 7500 = 75%)
 //   liquidationLtvBps  LTV at which the position is liquidatable (e.g. 9200 = 92%)
-//   priceSource        "underlying" (value via the vault's own get_asset_amounts_per_shares + PRICED_TOKENS)
+//   priceSource        "underlying" (vault's get_asset_amounts_per_shares + PRICED_TOKENS) | "par"
+//                      | "etherfuse" (etherfuse.js: public lookup price × live FX, for RWA bonds)
+//   clawback           true = issuer can claw back the balance → applies POLICY.clawbackFactor (0.50)
+//   issuer, decimals   (asset kind) the classic issuer G-address + token decimals, for verification
 //   enabled            false = kept in the list for reference but not accepted as collateral
 
 const REGISTRIES = {
@@ -48,6 +53,29 @@ const REGISTRIES = {
       parUsd: 1,
       faucet: "CB5LTMEKUKMSTRBC4CMML5YAHBCPHIDTPZ6F6INKX56FS6XA73C4Y7S3",
       escrow: "CCM4QHKGCEAE3FKNB3SGJ74ZHPHLWNAAB5BBVMDECXISB26MXAPHNFZG",
+      enabled: true,
+    },
+    // Etherfuse CETES — first RWA collateral on testnet, a tokenized Mexican CETES T-bill issued by
+    // the Etherfuse SANDBOX (issuer home_domain sand.etherfuse.com). Unlike the entries above it is a
+    // classic-asset SAC held DIRECTLY in the wallet (kind "asset"), not a vault share token, so the
+    // engine values it via tokenCollateral + the `rwa` haircut class. Freely transferable (issuer
+    // auth_required=false) so the escrow can custody it, but clawback + auth_revocable are enabled, so
+    // it carries the 0.50 clawback factor (clawback:true) and conservative advance/liquidation bands.
+    // USD price is NOT from asset_prices: it comes from etherfuse.js (public /lookup/stablebonds price
+    // in MXN × live MXN→USD FX). Obtained via the Etherfuse sandbox onramp, not a mint. SAC id derived
+    // from CETES:GC3CW7…UPS4 on Test SDF Network and verified on testnet (num_contracts 47).
+    CC72F57YTPX76HAA64JQOEGHQAPSADQWSY5DWVBR66JINPFDLNCQYHIC: {
+      protocol: "etherfuse",
+      kind: "asset",
+      label: "Etherfuse CETES (tokenized MXN T-bill)",
+      symbol: "CETES",
+      underlyingClass: "rwa",
+      advanceBps: 6000,
+      liquidationLtvBps: 8500,
+      priceSource: "etherfuse",
+      clawback: true,
+      issuer: "GC3CW7EDYRTWQ635VDIGY6S4ZUF5L6TQ7AA4MWS7LEQDBLUSZXV7UPS4",
+      decimals: 7,
       enabled: true,
     },
     // Add more as they are deployed + risk-approved on testnet, same shape.
@@ -91,6 +119,8 @@ function supportedCollateral(network = activeNetwork()) {
       liquidationLtv: v.liquidationLtvBps / 10000,
       priceSource: v.priceSource || "underlying",
       parUsd: v.parUsd != null ? v.parUsd : null,
+      clawback: v.clawback === true,
+      issuer: v.issuer || null,
       faucet: v.faucet || null,
     }));
 }

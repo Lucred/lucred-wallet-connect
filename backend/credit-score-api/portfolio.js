@@ -43,6 +43,13 @@ const PRICED_TOKENS = {
   // TESOURO (Brazil treasury bond, Etherfuse): issuer home_domain etherfuse.com, contract id
   // matches stellar.expert's record, Etherfuse live price within 0.1% of its market price.
   CD6M4R2322BYCY2LNWM74PEBQAQ63SA3DUJLI3L4225U4ZVCLMSCBCIS: "TESOURO",
+  // More Etherfuse stablebonds (same issuer GCRYUGD5…, found via the RWA issuer-asset monitor,
+  // 2026-11-18). Priced from Etherfuse's mainnet /lookup/stablebonds tokenPriceDecimal × FX, into
+  // asset_prices (source etherfuse-live). MEX = Mexican bond (MXN), GILTS = UK gilts (GBP),
+  // KTB = Korean T-bonds (KRW). (MEXe/CETESZ have no Etherfuse API price → left unpriced, like EUROB.)
+  CA4BHPZHZAFLKFRNBIQLEMAYIRWNC7T74ML4L5HTNPZPUZMWUPTSE5Q3: "MEX",
+  CCQNEBGX5RJQGNLQ25C67DZLOSNM4NFQBANUS3ASALF2X552BSIQ6XCE: "GILTS",
+  CBAECV6UVDS6ZKPMC63MUYY4V7Q3KTHR7NLUFGVVGK7K3AQT475QTETP: "KTB",
   // Ondo USDY (yield-bearing short-Treasury wrapper): asset USDY:GAJMPX5N..., SAC id matches;
   // freely transferable (issuer auth_required=false), clawback-enabled (flag reported separately).
   // Largest freely-transferable RWA on Stellar (~$535M, 4,118 holders indexed). Needs the USDY row

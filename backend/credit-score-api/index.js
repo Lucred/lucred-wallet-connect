@@ -26,25 +26,37 @@ const CLOSE_EPSILON = 1e-4;
 
 function computeDebtCycles(events) {
   const relevant = events
-    .filter(
-      (e) =>
-        e.protocolName === "blend" &&
-        (e.eventType === "borrow" || e.eventType === "repay") &&
-        (e.poolShareTokensAfter !== undefined && e.poolShareTokensAfter !== null ||
-          e.collateralRatioAfter !== undefined && e.collateralRatioAfter !== null)
-    )
+    .filter((e) => {
+      if (e.eventType !== "borrow" && e.eventType !== "repay") return false;
+      // Blend: the loan balance for cycle detection comes from the event's pool-share-tokens /
+      // collateral-ratio AFTER value.
+      if (e.protocolName === "blend") {
+        return (e.poolShareTokensAfter !== undefined && e.poolShareTokensAfter !== null) ||
+               (e.collateralRatioAfter !== undefined && e.collateralRatioAfter !== null);
+      }
+      // LCRD's own credit-line pool emits borrowed/repaid (normalized to borrow/repay) with no
+      // balance-after field, so we track the running principal from the amounts directly (see delta).
+      // A borrower repaying their LCRD loan thus builds the same repayment-speed / completed-loan
+      // signal as any other lending protocol.
+      if (e.protocolName === "lcrd") return true;
+      return false;
+    })
     .sort((a, b) => new Date(a.blockCloseTime).getTime() - new Date(b.blockCloseTime).getTime());
 
   const open = new Map();
   const cycles = [];
 
   for (const e of relevant) {
-    const shareTokens =
-      e.poolShareTokensAfter !== undefined && e.poolShareTokensAfter !== null
-        ? e.poolShareTokensAfter
-        : e.collateralRatioAfter;
+    // Blend sums its (confusingly-named) balance-after field; LCRD tracks principal from the amount
+    // drawn (borrow) and repaid (repay), closing the cycle when principal returns to ~0.
+    const magnitude =
+      e.protocolName === "lcrd"
+        ? e.amount
+        : e.poolShareTokensAfter !== undefined && e.poolShareTokensAfter !== null
+          ? e.poolShareTokensAfter
+          : e.collateralRatioAfter;
     const key = e.userAddress + "|" + e.contractId + "|" + (e.assetContractId || "");
-    const delta = e.eventType === "borrow" ? shareTokens : -shareTokens;
+    const delta = e.eventType === "borrow" ? magnitude : -magnitude;
 
     let cur = open.get(key);
     if (!cur) {
@@ -558,6 +570,47 @@ async function fetchLiveRwaPrices() {
   return out;
 }
 
+// Etherfuse stablebonds are priced from Etherfuse's own mainnet lookup: tokenPriceDecimal is the
+// price in the bond's local currency (bondCurrency), converted to USD with live FX. This keeps every
+// Etherfuse ticker (CETES/USTRY/TESOURO/MEX/GILTS/KTB) fresh so their asset_prices seed rows don't
+// drift with accrued yield or FX. Non-fatal: any failure (or a missing FX rate) keeps the seed.
+const ETHERFUSE_LOOKUP_URL = process.env.ETHERFUSE_MAINNET_LOOKUP_URL || "https://api.etherfuse.com/lookup/stablebonds";
+const ETHERFUSE_FX_URL = process.env.ETHERFUSE_FX_URL || "https://open.er-api.com/v6/latest/"; // + <CCY>
+const ETHERFUSE_TICKERS = new Set(["CETES", "USTRY", "TESOURO", "MEX", "GILTS", "KTB"]);
+
+async function fetchEtherfuseLivePrices() {
+  const res = await fetch(ETHERFUSE_LOOKUP_URL, { signal: AbortSignal.timeout(8000), headers: { accept: "application/json" } });
+  if (!res.ok) throw new Error("etherfuse HTTP " + res.status);
+  const j = await res.json();
+  const bonds = Array.isArray(j && j.stablebonds) ? j.stablebonds : [];
+  const fxCache = {};
+  const fxToUsd = async (ccy) => {
+    const code = String(ccy || "").toUpperCase();
+    if (code === "USD") return 1;
+    if (!code) return null;
+    if (fxCache[code] !== undefined) return fxCache[code];
+    try {
+      const r = await fetch(ETHERFUSE_FX_URL + encodeURIComponent(code), { signal: AbortSignal.timeout(8000), headers: { accept: "application/json" } });
+      if (!r.ok) throw new Error("fx HTTP " + r.status);
+      const fj = await r.json();
+      const rate = Number(fj && fj.rates && fj.rates.USD);
+      fxCache[code] = rate > 0 ? rate : null;
+    } catch { fxCache[code] = null; }
+    return fxCache[code];
+  };
+  const out = {};
+  for (const b of bonds) {
+    const sym = b && b.symbol;
+    if (!sym || !ETHERFUSE_TICKERS.has(sym)) continue;
+    const native = Number(b.tokenPriceDecimal);
+    if (!(native > 0)) continue;
+    const rate = await fxToUsd(b.bondCurrency);
+    if (!(rate > 0)) continue; // FX unavailable -> keep the asset_prices seed for this ticker
+    out[sym] = native * rate;
+  }
+  return out;
+}
+
 async function refreshReferenceData() {
   try {
     const [priceRows] = await bq.query("SELECT assetCode, usdRate, isStable, isResearched FROM `credit_bureau.asset_prices`");
@@ -573,6 +626,17 @@ async function refreshReferenceData() {
       if (Object.keys(live).length) console.log("Live RWA NAVs: " + Object.entries(live).map(([k, v]) => `${k}=${v}`).join(", "));
     } catch (err) {
       console.error("Live RWA price refresh failed, keeping asset_prices values:", err.message);
+    }
+    // Override Etherfuse stablebond rates with their live NAV (local price * FX) from Etherfuse's API.
+    try {
+      const eth = await fetchEtherfuseLivePrices();
+      for (const [ticker, usd] of Object.entries(eth)) {
+        if (newPriceMap[ticker]) newPriceMap[ticker].usdRate = usd;
+        else newPriceMap[ticker] = { usdRate: usd, isStable: false, isResearched: true };
+      }
+      if (Object.keys(eth).length) console.log("Etherfuse live NAVs: " + Object.entries(eth).map(([k, v]) => `${k}=${v.toFixed(6)}`).join(", "));
+    } catch (err) {
+      console.error("Etherfuse live price refresh failed, keeping asset_prices values:", err.message);
     }
     assetPriceMap = newPriceMap;
 

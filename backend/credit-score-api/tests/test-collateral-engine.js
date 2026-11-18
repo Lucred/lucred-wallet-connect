@@ -1,6 +1,6 @@
 const assert = require("assert");
 const { buildCollateral, priceApr, POLICY } = require("../credit-line");
-const { defindexCollateral, quote } = require("../collateral-engine");
+const { defindexCollateral, tokenCollateral, quote } = require("../collateral-engine");
 
 // Builders matching portfolio.js output shapes.
 const ua = (code, usd, extra = {}) => ({ code, contractId: "C" + code, amount: usd, usdValue: usd, priceSource: "verified", ...extra });
@@ -96,5 +96,49 @@ const xlmVault = quote({ portfolio: { wallet: "GV", totals: { debtUsd: 0 }, toke
 assert.strictEqual(xlmVault.eligible, true);
 assert.strictEqual(xlmVault.collateral.lendableUsd, 5850);
 assert.ok(xlmVault.advance.principalUsd <= 5850);
+
+// ---- Directly-held RWA token collateral (Etherfuse CETES on testnet) ----
+// A classic-asset SAC held straight in the wallet (kind "asset"), priced in USD by etherfuse.js,
+// classed `rwa` (haircut 0.25) and clawback-enabled (clawbackFactor 0.50).
+const CETES_ID = "CC72F57YTPX76HAA64JQOEGHQAPSADQWSY5DWVBR66JINPFDLNCQYHIC";
+const efReg = {
+  [CETES_ID]: { protocol: "etherfuse", kind: "asset", label: "Etherfuse CETES", symbol: "CETES", underlyingClass: "rwa", advanceBps: 6000, liquidationLtvBps: 8500, priceSource: "etherfuse", clawback: true, enabled: true },
+};
+// $1000 of CETES held directly (priceSource "verified" so it classifies as rwa, clawback true).
+const cetesTok = { code: "CETES", contractId: CETES_ID, balance: "16238.0000000", usdValue: 1000, usdPrice: 0.0616, transferable: true, priceSource: "verified", clawback: true };
+const cetesPortfolio = { wallet: "GCETES", totals: { debtUsd: 0 }, tokens: [cetesTok], positions: [] };
+
+// 14. tokenCollateral values CETES via rwa class + clawback factor: 1000 * 0.75 (rwa) * 0.50 (clawback) = 375.
+const tc = tokenCollateral(cetesPortfolio, POLICY, efReg);
+assert.strictEqual(tc.assets.length, 1, "CETES should be counted as one asset");
+assert.strictEqual(tc.marketUsd, 1000);
+assert.strictEqual(tc.lendableUsd, 375, "rwa 0.25 haircut + 0.50 clawback factor");
+assert.strictEqual(tc.assets[0].clawback, true);
+assert.strictEqual(tc.assets[0].symbol, "CETES");
+
+// 15. Quote on CETES: advance 0.60 of market (600) capped at lendable (375) -> principal 375.
+const qc = quote({ portfolio: cetesPortfolio, score: score(80), structure: "open_ended" }, POLICY, efReg);
+assert.strictEqual(qc.eligible, true);
+assert.strictEqual(qc.collateral.assets.length, 1);
+assert.strictEqual(qc.collateral.vaults.length, 0);
+assert.strictEqual(qc.advance.principalUsd, 375, "clawback-haircut lendable binds the advance");
+assert.ok(qc.advance.principalUsd <= qc.collateral.lendableUsd);
+
+// 16. Allowlist is by contract id: a scam token calling itself CETES from another contract is NOT collateral.
+const scamTok = { code: "CETES", contractId: "CSCAM", balance: "1", usdValue: 999999, transferable: true, priceSource: "verified", clawback: false };
+const tcScam = tokenCollateral({ wallet: "GS", tokens: [scamTok], positions: [] }, POLICY, efReg);
+assert.strictEqual(tcScam.assets.length, 0, "only registry-whitelisted contract ids count as asset collateral");
+
+// 17. Combined wallet: a DeFindex USDC vault + a directly-held CETES asset both count; totals sum.
+const comboQ = quote({ portfolio: { wallet: "GC", totals: { debtUsd: 0 }, tokens: [cetesTok], positions: [dfPos("CVUSDC", [ua("USDC", 20000)])] }, score: score(80), structure: "open_ended" }, POLICY, efReg);
+assert.strictEqual(comboQ.collateral.vaults.length, 1, "vault still counts alongside the asset entry");
+assert.strictEqual(comboQ.collateral.assets.length, 1);
+assert.strictEqual(comboQ.collateral.marketUsd, 21000, "20000 vault + 1000 CETES");
+// principal = vault min(20000*0.60,17100)=12000 + CETES min(1000*0.60,375)=375 = 12375.
+assert.strictEqual(comboQ.advance.principalUsd, 12375);
+
+// 18. Non-transferable CETES (issuer froze the trustline) is excluded from collateral.
+const frozen = tokenCollateral({ wallet: "GF", tokens: [{ ...cetesTok, transferable: false }], positions: [] }, POLICY, efReg);
+assert.strictEqual(frozen.assets.length, 0, "a non-transferable holding can't be pledged");
 
 console.log("all collateral-engine assertions passed");

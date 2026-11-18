@@ -36,7 +36,11 @@ function defindexCollateral(portfolio, policy = POLICY, registry = {}) {
   // Eligibility: prefer the curated supported-collateral registry (enabled share-tokens); else the
   // policy's eligibleVaults; else — pre-registry fallback — any priced, transferable position. So an
   // empty mainnet registry still works until the list is filled in.
-  const regIds = Object.keys(registry || {}).filter((id) => registry[id].enabled);
+  // Only vault-type registry entries gate the vault allowlist — directly-held asset entries
+  // (kind "asset"/"token") are handled by tokenCollateral and must not filter out vault positions.
+  const regIds = Object.keys(registry || {}).filter(
+    (id) => registry[id].enabled && registry[id].kind !== "asset" && registry[id].kind !== "token"
+  );
   const policyAllow = (policy.dfCredit && policy.dfCredit.eligibleVaults) || [];
   const allow = regIds.length ? regIds : policyAllow;
   const eligible = allow.length ? positions.filter((p) => allow.includes(p.pool)) : positions;
@@ -66,24 +70,81 @@ function defindexCollateral(portfolio, policy = POLICY, registry = {}) {
   return { vaults, marketUsd: overall.marketUsd, lendableUsd: overall.lendableUsd, averageHaircut: overall.averageHaircut };
 }
 
+// Value a wallet's DIRECTLY-HELD registry-whitelisted tokens as collateral (as opposed to vault
+// share tokens above) — e.g. an Etherfuse RWA bond like CETES held straight in the wallet. Keyed by
+// the token's own contract id; only entries with kind "asset"/"token" are considered here so a vault
+// share-token never double-counts. Reuses buildCollateral so the per-class haircut (rwa 0.25) and the
+// clawback factor (0.50 for clawback-enabled issuers like Etherfuse) are identical to /credit-line.
+function tokenCollateral(portfolio, policy = POLICY, registry = {}) {
+  const tokens = (((portfolio && portfolio.tokens) || []).filter(
+    (t) => t.transferable === true && t.usdValue !== null && t.usdValue !== undefined
+  ));
+  const regIds = Object.keys(registry || {}).filter(
+    (id) => registry[id].enabled && (registry[id].kind === "asset" || registry[id].kind === "token")
+  );
+  const eligible = regIds.length ? tokens.filter((t) => regIds.includes(t.contractId)) : [];
+
+  const overall = buildCollateral({ tokens: eligible, positions: [] }, policy);
+  const assets = eligible
+    .map((t) => {
+      const one = buildCollateral({ tokens: [t], positions: [] }, policy);
+      const reg = (registry && registry[t.contractId]) || null;
+      return {
+        token: t.contractId,
+        label: reg && reg.label ? reg.label : null,
+        symbol: reg && reg.symbol ? reg.symbol : (t.code || null),
+        kind: reg && reg.kind ? reg.kind : "asset",
+        code: t.code || null,
+        amount: t.balance,
+        usdPrice: t.usdPrice != null ? t.usdPrice : null,
+        clawback: t.clawback === true,
+        marketUsd: one.marketUsd,
+        lendableUsd: one.lendableUsd,
+        haircutPct: round2(one.averageHaircut * 100),
+        priceSource: t.priceSource || null,
+        advanceRate: reg && reg.advanceBps ? reg.advanceBps / 10000 : null,
+        liquidationLtv: reg && reg.liquidationLtvBps ? reg.liquidationLtvBps / 10000 : null,
+      };
+    })
+    .filter((a) => a.marketUsd > 0);
+
+  return { assets, marketUsd: overall.marketUsd, lendableUsd: overall.lendableUsd, averageHaircut: overall.averageHaircut };
+}
+
+// Combined engine collateral: DeFindex vault positions + directly-held whitelisted tokens, merged
+// into one view the quote prices off. Totals recompute the blended haircut across both.
+function engineCollateral(portfolio, policy = POLICY, registry = {}) {
+  const v = defindexCollateral(portfolio, policy, registry);
+  const a = tokenCollateral(portfolio, policy, registry);
+  const marketUsd = round2(v.marketUsd + a.marketUsd);
+  const lendableUsd = round2(v.lendableUsd + a.lendableUsd);
+  return {
+    vaults: v.vaults,
+    assets: a.assets,
+    marketUsd,
+    lendableUsd,
+    averageHaircut: marketUsd > 0 ? round2(1 - lendableUsd / marketUsd) : 0,
+  };
+}
+
 // Compute the full quote/terms for a dfToken-backed USDC advance. Pure given the inputs + policy.
 // structure: "open_ended" (default) | "fixed_term"; termDays only used for fixed_term.
 function quote({ portfolio, score, structure, termDays }, policy = POLICY, registry = {}) {
   const cfg = policy.dfCredit;
   const wallet = (score && score.wallet) || (portfolio && portfolio.wallet) || null;
   const s = score && typeof score.score === "number" ? score.score : 0;
-  const collateral = defindexCollateral(portfolio, policy, registry);
+  const collateral = engineCollateral(portfolio, policy, registry);
 
-  if (!collateral.vaults.length || collateral.lendableUsd <= 0) {
+  if ((!collateral.vaults.length && !collateral.assets.length) || collateral.lendableUsd <= 0) {
     return {
       version: cfg.version,
       policyVersion: policy.version,
       wallet,
       asOf: new Date().toISOString(),
       eligible: false,
-      reason: !(portfolio && portfolio.positions)
-        ? "Holdings couldn't be read, so DeFindex collateral can't be valued."
-        : "No priced, transferable DeFindex vault position found for this wallet.",
+      reason: !(portfolio && (portfolio.positions || portfolio.tokens))
+        ? "Holdings couldn't be read, so collateral can't be valued."
+        : "No priced, transferable DeFindex vault position or supported collateral asset found for this wallet.",
       demo: true,
       disclaimer: DISCLAIMER
     };
@@ -99,15 +160,18 @@ function quote({ portfolio, score, structure, termDays }, policy = POLICY, regis
   // vault/LP is sized on its own risk), else the flat policy default across the bundle. Each vault is
   // hard-capped at its own risk-adjusted lendable value (the haircut/lpFactor is a safety ceiling).
   const defaultRate = clamp(cfg.advance.defaultRate, cfg.advance.minRate, cfg.advance.maxRate);
-  const hasPerVault = collateral.vaults.some((v) => v.advanceRate != null);
-  const principalUsd = hasPerVault
-    ? round2(collateral.vaults.reduce((sum, v) => {
-        const r = clamp(v.advanceRate != null ? v.advanceRate : defaultRate, cfg.advance.minRate, cfg.advance.maxRate);
-        return sum + Math.min(v.marketUsd * r, v.lendableUsd);
+  // Size each collateral item (vault share-token OR directly-held asset) on its own risk when the
+  // registry gives it an advance rate; each is hard-capped at its own risk-adjusted lendable value.
+  const items = [...collateral.vaults, ...collateral.assets];
+  const hasPerItem = items.some((it) => it.advanceRate != null);
+  const principalUsd = hasPerItem
+    ? round2(items.reduce((sum, it) => {
+        const r = clamp(it.advanceRate != null ? it.advanceRate : defaultRate, cfg.advance.minRate, cfg.advance.maxRate);
+        return sum + Math.min(it.marketUsd * r, it.lendableUsd);
       }, 0))
     : round2(Math.min(collateral.marketUsd * defaultRate, collateral.lendableUsd));
-  // Reported advance rate: the blended effective rate when per-vault, else the flat default (unchanged).
-  const rate = hasPerVault
+  // Reported advance rate: the blended effective rate when per-item, else the flat default (unchanged).
+  const rate = hasPerItem
     ? (collateral.marketUsd > 0 ? round4(principalUsd / collateral.marketUsd) : defaultRate)
     : defaultRate;
 
@@ -173,4 +237,4 @@ function health() {
   throw new Error("On-chain health tracking is enabled in the on-chain stage (Stage B), not in this demo.");
 }
 
-module.exports = { defindexCollateral, quote, attest, health };
+module.exports = { defindexCollateral, tokenCollateral, engineCollateral, quote, attest, health };
