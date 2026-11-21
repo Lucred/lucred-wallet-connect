@@ -8,6 +8,8 @@ import { loadCreditLine, resetCreditLine, setWaitlistWallet } from "./creditLine
 const STELLAR_ADDRESS_PATTERN = /^[GC][A-Z2-7]{55}$/;
 // SEP-0002 federation name, e.g. jack*useveilapp.xyz — resolved to a G-account server-side by the score API.
 const FEDERATION_PATTERN = /^[^*\s@]+\*(?:[a-z0-9-]+\.)+[a-z]{2,}$/i;
+// Soroban Domains name, e.g. earrietadev.xlm (or a subdomain) — resolved to a G-account server-side by the score API.
+const SOROBAN_DOMAIN_PATTERN = /^(?:[a-z]{1,15}\.)+xlm$/i;
 
 const connectStage = document.getElementById("connect-stage")!;
 const connectedStage = document.getElementById("connected-stage")!;
@@ -229,14 +231,16 @@ pasteForm.addEventListener("submit", async (e) => {
   clearError();
   const raw = pasteInput.value.trim();
   const isAddress = STELLAR_ADDRESS_PATTERN.test(raw.toUpperCase());
+  const isDomain = SOROBAN_DOMAIN_PATTERN.test(raw);
   const isFederation = FEDERATION_PATTERN.test(raw);
 
-  if (!isAddress && !isFederation) {
-    showError("Enter a Stellar address (G… or C…) or a federation name like name*domain.");
+  if (!isAddress && !isDomain && !isFederation) {
+    showError("Enter a Stellar address (G… or C…), a Soroban domain like name.xlm, or a federation name like name*domain.");
     return;
   }
-  // Raw addresses are case-normalised; a federation name is sent as-is and the API resolves it to a G-account.
-  const address = isAddress ? raw.toUpperCase() : raw;
+  // Raw addresses are case-normalised; a domain is lower-cased; a federation name
+  // is sent as-is. The API resolves domains and federation names to a G-account.
+  const address = isAddress ? raw.toUpperCase() : isDomain ? raw.toLowerCase() : raw;
 
   pasteBtn.disabled = true;
   pasteBtn.textContent = "Scoring…";
