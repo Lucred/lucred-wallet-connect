@@ -40,6 +40,11 @@ function computeDebtCycles(events) {
       // A borrower repaying their LCRD loan thus builds the same repayment-speed / completed-loan
       // signal as any other lending protocol.
       if (e.protocolName === "lcrd") return true;
+      // K2 Lend (Aave-V3-style) emits named borrow/repay events whose data map carries the
+      // `amount` directly, with no balance-after field — identical shape to LCRD's, so track the
+      // running principal from the amounts (see magnitude/delta below). Keyed per reserve asset,
+      // so a wallet's XLM loan and USDC loan form independent cycles.
+      if (e.protocolName === "k2_lend") return true;
       return false;
     })
     .sort((a, b) => new Date(a.blockCloseTime).getTime() - new Date(b.blockCloseTime).getTime());
@@ -51,7 +56,7 @@ function computeDebtCycles(events) {
     // Blend sums its (confusingly-named) balance-after field; LCRD tracks principal from the amount
     // drawn (borrow) and repaid (repay), closing the cycle when principal returns to ~0.
     const magnitude =
-      e.protocolName === "lcrd"
+      e.protocolName === "lcrd" || e.protocolName === "k2_lend"
         ? e.amount
         : e.poolShareTokensAfter !== undefined && e.poolShareTokensAfter !== null
           ? e.poolShareTokensAfter

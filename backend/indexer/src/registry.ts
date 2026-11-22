@@ -563,7 +563,31 @@ export const PROTOCOL_REGISTRY: Record<string, ProtocolInfo> = {
   // asset; there is no way to attribute a specific claim to its
   // distribution's real asset without correlating back to that
   // distribution's own `distribution_created` event, not built here.
-  CD6G3UTDV4XPDMVNYTPQ6UCL7FWSYG5LXYAZXBDDSKY5YOQ6HLDBPYRY: { protocolName: 'fundable', category: 'mass_distribution', defaultAssetCode: 'XLM' }
+  CD6G3UTDV4XPDMVNYTPQ6UCL7FWSYG5LXYAZXBDDSKY5YOQ6HLDBPYRY: { protocolName: 'fundable', category: 'mass_distribution', defaultAssetCode: 'XLM' },
+
+  // --- FxDAO — DELIBERATELY NOT INDEXED (re-confirmed 2026-11-22, see third-party-scoring-protocols memory).
+  //     Vaults CDP core CCUN4RXU5VNDHSF4S4RKV4ZJYMX2YWKOH6L4AKEKVNVDQ7HY5QIAO4UB is DORMANT (last
+  //     event 2026-05-19) and emits only fn_call/fn_return — no named borrow/repay events to map
+  //     (would need brittle fn-call-arg decoding). Locking Pool CDCART6W…HLXIP has ~4 events. Skip.
+
+  // --- K2 Lend (Aave-V3-style lending) — mainnet router from DefiLlama's own adapter
+  //     (projects/k2-lend/index.js). Supply/borrow/repay/flash-loan all route through this one
+  //     contract; reserves are USDC/XLM/PYUSD/SolvBTC. The per-reserve aToken/debtToken pairs are
+  //     SEP-41 tokens, intentionally NOT indexed here (they'd double-count with router events).
+  //     debtTokens for later cycle work: USDC CBN4GDHRJN7AIARTSTUD3OK7IOCU5V6HTSOTVARFUA5KVE7XSNBZUQG6,
+  //     XLM CC3OKG4VDLGFBS7V6UTSJVP3YL3A4OLV63EMTNUU3MQ2AOAU4M65H7QG,
+  //     PYUSD CAVFE34MWBIXT4AOFXPTI7U7JTLPHKG4YWDDMRXVJOIZKG6HFJW3IHXV,
+  //     SolvBTC CADGKVZKBNLPKFIWDWTRSQAPBWH77H2OPJIF3WGVL7VADVLCXDZ5CSNH.
+  //     v1 = ACTIVITY; borrow→repay cycles need a 'k2_lend' branch in computeDebtCycles + parser work.
+  CCTUJZLYFAW7ZNQD2SXMUZIHBUUJJICYRKWLZJ6SK6TGNAWNXOJIV6J7: { protocolName: 'k2_lend', category: 'lending_pool' }, // Router (supply/borrow/repay/flash)
+
+  // --- Vaquita (fixed-yield gamified savings) — mainnet pool from DefiLlama's adapter
+  //     (projects/vaquita-protocol/index.js: "Vaquita fixed-yield pool on Stellar mainnet"; the
+  //     Base deployment was sunset 2026-08-06). Principal routes into a Vaquita-managed DeFindex
+  //     vault; users deposit/withdraw + claim rewards. Category yield_savings so realized yield
+  //     (withdraw>deposit) feeds the income path — netting activates once the parser maps its
+  //     deposit/withdraw events.
+  CDTTAZ3NK4MMDHK2C3I6LRDT4YADJZ2QXINKLKQNZUVX7OTUKQNCQGC4: { protocolName: 'vaquita', category: 'yield_savings' }, // fixed-yield savings pool
 
   // --- Left out on purpose ---
   // See README.md's "Registry research notes" for the full list and why:
