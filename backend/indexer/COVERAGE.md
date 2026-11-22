@@ -23,6 +23,7 @@ Three layers feed the score:
 | **XOXNO Lending** | lending_debt | 1 | borrow/repay (RWA-collateralised) |
 | **Slender** | lending_pool | 1 | borrow/repay |
 | **Alula** | lending_pool | 1 | borrow/repay (looping) |
+| **K2 Lend** | lending_pool | 1 (router) | borrow→repay (credit, Aave-V3-style), supply (activity) — *added 2026-11-22* |
 | **LCRD** (our pool) | lending_pool | 1 | our own borrow/repay — **TESTNET**, dormant until mainnet |
 | **Phoenix DeFi Hub** | amm_liquidity | 13 | swaps / LP (activity) |
 | **Soroswap** | amm_router + amm_factory | 2 | swaps (activity) |
@@ -31,6 +32,7 @@ Three layers feed the score:
 | **Spectra Finance** | yield_derivatives | 7 | PT mint/redeem/yield-claim (activity) — *added 2026-11-15* |
 | **Stellar DeFi Hub** | yield_savings | 3 | deposit/withdraw (activity + yield income) |
 | **Gami / Upshift** | yield_savings | 2 | yield (activity + income) |
+| **Vaquita** | yield_savings | 1 | deposit/withdraw → realized-yield income (fixed-yield savings) — *added 2026-11-22* |
 | **Templar** | yield_savings | 1 | **collateral/deposit side only** — borrow lives on NEAR |
 | **Normal** | wrapped_asset | 1 | wrapped-asset activity |
 | **WisdomTree** | rwa_treasury | 9 | RWA holdings/activity |
@@ -75,11 +77,12 @@ Franklin BENJI, Etherfuse EUROB/KTB, Centrifuge JTRSY/JAAA, WisdomTree gold, Sol
 - **Excellar** (futurenet), Vanna, Mystic, Laina, Lantern, Legasi, CoopStable, HedgePay, Trilobyte, Crebit
 - Yield: Arka, Strata, Principal Protocol, Pods, Lusty, Cushion, Backyard, Meria, Prism
 - RWA tokenisers: Spydra, SiBorg, Verseprop, Minah, Liqvid, Splyce, Rivool, ALTERNUN, EnerDAO, EquitX, Dobprotocol, Metafyed, Neovestor, TokenOps, Mojoflower, Gearup
+- *stellar.org DeFi directory sweep (2026-11-22, 32 projects): no new mainnet-indexable adds.* Early/unverified to watch at mainnet activity: Wombat Exchange (stableswap AMM), Raum Network, Stride, Upwealth, Reyts. Infra/analytics/CeFi skipped: Autowhale, Hoops Finance, StellarBroker, StellarTerm, Balanced (ICON-side bridge balance, no Stellar contract).
 
 **Income platforms, pre-mainnet (will auto-surface via `tw-platform-report`):** Trustless OSS, ArcusX, Brújula, Eascrow, Push, Nila (first mainnet disbursement targeted Dec 2026)
 
 **Already captured upstream (ride Blend pools we index):** Yieldblox, YieldBack.Cash, For Yield
-**Mainnet-live but not worth it:** FxDAO (vault `CCUN4RXU…` dormant since May 2026 + emits no named borrow/repay events), OrbitCDP (its CDP *is* a Blend pool `CAE7QVOM…` we already index)
+**Mainnet-live but not worth it:** FxDAO (vault `CCUN4RXU…` dormant since May 2026 + emits only `fn_call`/`fn_return`, no named borrow/repay events — re-confirmed 2026-11-22), OrbitCDP (its CDP *is* a Blend pool `CAE7QVOM…` we already index)
 **Dead:** Lumen Later (dormant 9mo)
 **B2B trade-credit / receivables (design-ready, folded into the score when live — see §6):** Airswift, Indentura, Trilobyte · *excluded as corporate financing:* Mercato, Stellar-VaultLink, ClickPesa Debt Fund
 **Not indexable (nothing to score):** wallets (Lobstr, Varial/Freighter, xBull, Hana, Albedo, OneKey, Ledger, Trezor, Beans), anchors/payments (MoneyGram, Yellow Card, Flutterwave, Wave), DEX Lumenswap (low value / not mainnet-confirmed)
