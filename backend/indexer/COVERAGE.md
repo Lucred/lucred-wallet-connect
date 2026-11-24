@@ -80,6 +80,7 @@ Franklin BENJI, Etherfuse EUROB/KTB, Centrifuge JTRSY/JAAA, WisdomTree gold, Sol
 - *stellar.org DeFi directory sweep (2026-11-22, 32 projects): no new mainnet-indexable adds.* Early/unverified to watch at mainnet activity: Wombat Exchange (stableswap AMM), Raum Network, Stride, Upwealth, Reyts. Infra/analytics/CeFi skipped: Autowhale, Hoops Finance, StellarBroker, StellarTerm, Balanced (ICON-side bridge balance, no Stellar contract).
 
 **Income platforms, pre-mainnet (will auto-surface via `tw-platform-report`):** Trustless OSS, ArcusX, Brújula, Eascrow, Push, Nila (first mainnet disbursement targeted Dec 2026)
+**Income platforms, pre-mainnet — payment-based (own payout account, NOT TrustlessWork escrow; won't auto-surface via `tw-platform-monitor` — watch manually, add payout account to the payer registry at mainnet, Drips/HackMeridian-style):** Centient (AI RLHF data-labeling → USDC per approved task; testnet payout acct `GCP34RITQIVSLHS5T4XZRENIBUS3T7FHL3VSR24GK7HPMHGAAKWK4BUO`, 2-of-3 multisig; co. artisam.xyz / centient@artisam.xyz) — *added 2026-11-24*
 
 **Already captured upstream (ride Blend pools we index):** Yieldblox, YieldBack.Cash, For Yield
 **Mainnet-live but not worth it:** FxDAO (vault `CCUN4RXU…` dormant since May 2026 + emits only `fn_call`/`fn_return`, no named borrow/repay events — re-confirmed 2026-11-22), OrbitCDP (its CDP *is* a Blend pool `CAE7QVOM…` we already index)
