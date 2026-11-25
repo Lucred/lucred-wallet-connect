@@ -48,6 +48,13 @@ Three layers feed the score:
 DeFindex (yield vaults) is integrated via the yield-income scorer + `vault_assets`/portfolio valuation
 (parser has a `defindex` branch), rather than as a scored registry protocol.
 
+**Fundable 2nd contract (staged, NOT indexed):** re-enumeration 2026-11-25 (Hubble, all mainnet contracts
+emitting `distribution_created`) found one other — `CDB4A75YTXE6MGSO7Z4F4URQSEQCRYIPJSIUGE4Q5XBBYR5IHUCHPRHQ`
+(admin `GAB4H32S…`, deployed 2026-11-24). It's a richer module (adds `investor_balances_set`,
+`whitelist_updated`, `manual_payout_amounts_set`) with a different event schema and **zero user claims yet**,
+so it's deliberately left out until real claimants appear + `resolveFundableAmount` is verified for it. See
+the Fundable note in `registry.ts`; re-run the query periodically to catch further deployments.
+
 ## 2. Income sources (`oss_bounty_events`)
 
 | Source | Rail | incomeType / weight | Status |
@@ -78,6 +85,8 @@ Franklin BENJI, Etherfuse EUROB/KTB, Centrifuge JTRSY/JAAA, WisdomTree gold, Sol
 - Yield: Arka, Strata, Principal Protocol, Pods, Lusty, Cushion, Backyard, Meria, Prism
 - RWA tokenisers: Spydra, SiBorg, Verseprop, Minah, Liqvid, Splyce, Rivool, ALTERNUN, EnerDAO, EquitX, Dobprotocol, Metafyed, Neovestor, TokenOps, Mojoflower, Gearup
 - *stellar.org DeFi directory sweep (2026-11-22, 32 projects): no new mainnet-indexable adds.* Early/unverified to watch at mainnet activity: Wombat Exchange (stableswap AMM), Raum Network, Stride, Upwealth, Reyts. Infra/analytics/CeFi skipped: Autowhale, Hoops Finance, StellarBroker, StellarTerm, Balanced (ICON-side bridge balance, no Stellar contract).
+- **SAFU Staking** (safustaking.com) — *insurance/cover, SCF-stage, very early (2026-11-25).* Hack-cover staking pool: stake USDC → up to 15× payout if a covered wallet is stolen (phish/approval/stolen key) or wrongly liquidated. Built on Stellar + Blend + DeFindex, SCF-funded. Barely live ($11.60 staked / 6 stakers / $10k cap; Solana side explicitly testnet — confirm Stellar pool is mainnet). **Its staked-USDC yield likely rides a DeFindex white-label vault — CHECK whether that vault = the "SAFU Protection" factory vault `discoverDeFindexVaults` already picks up (poolDiscovery.ts); if so the stake/deposit side is already covered.** The cover-*claim* payout itself is a weak one-time-receipt signal (like Fundable claims). Revisit when staking scales.
+- **LendWise** (lendwise.fi) — *not indexable (analytics/infra).* A lending-rate aggregator dashboard ("compare standardized net APYs across Aave, Morpho, Compound, Blend", 900+ markets). Users read data, don't transact on it → nothing to score. Same bucket as Hoops/StellarBroker/StellarTerm. Aggregates Blend, which we index directly anyway.
 
 **Income platforms, pre-mainnet (will auto-surface via `tw-platform-report`):** Trustless OSS, ArcusX, Brújula, Eascrow, Push, Nila (first mainnet disbursement targeted Dec 2026)
 **Income platforms, pre-mainnet — payment-based (own payout account, NOT TrustlessWork escrow; won't auto-surface via `tw-platform-monitor` — watch manually, add payout account to the payer registry at mainnet, Drips/HackMeridian-style):** Centient (AI RLHF data-labeling → USDC per approved task; testnet payout acct `GCP34RITQIVSLHS5T4XZRENIBUS3T7FHL3VSR24GK7HPMHGAAKWK4BUO`, 2-of-3 multisig; co. artisam.xyz / centient@artisam.xyz) — *added 2026-11-24*

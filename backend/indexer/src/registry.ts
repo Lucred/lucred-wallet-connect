@@ -547,6 +547,19 @@ export const PROTOCOL_REGISTRY: Record<string, ProtocolInfo> = {
   // So this registry entry may not be Fundable's only mainnet contract if
   // they later split payroll/streaming into separate deployments - revisit
   // if their site's claimed scale ($100k+ transacted) doesn't show up here.
+  // RE-ENUMERATED 2026-11-25 via Hubble (history_contract_events WHERE
+  // topic[0] = 'distribution_created', a Fundable-distinctive symbol, over ALL
+  // mainnet contracts): found exactly one OTHER contract -
+  // CDB4A75YTXE6MGSO7Z4F4URQSEQCRYIPJSIUGE4Q5XBBYR5IHUCHPRHQ (admin
+  // GAB4H32S6QSXQMER33DUL6CFTBXX67ZLNKYL6K7JBMEDYU6SHQKFCVH3, different from
+  // this contract's GDZJSPRS... admin; deployed 2026-11-24). DELIBERATELY NOT
+  // ADDED YET: (1) it's a richer/different module - events include
+  // investor_balances_set, whitelist_updated, manual_payout_amounts_set
+  // alongside distribution_created - so its event schema differs from this
+  // claim module's and resolveFundableAmount is NOT verified for it; (2) it has
+  // had ZERO user `claim`s so far (admin config only), i.e. nothing to score
+  // yet. Add it (with a schema check + likely a dedicated resolver) once real
+  // claimants appear on it. Re-run the same query to catch further deployments.
   // CATEGORY IS A DELIBERATE CHOICE, not a TVL-style DeFi category: a claim
   // event is a one-time receipt of an already-earned/allocated distribution,
   // not repayment or collateral behavior - weaker as a credit signal than
@@ -557,12 +570,13 @@ export const PROTOCOL_REGISTRY: Record<string, ProtocolInfo> = {
   // picker was flattening in alongside the real data-vec amount and picking
   // wrong (same class of bug as Normal's mint/redeem) - see
   // resolveFundableAmount in xdrParser.ts. `claim`'s own event data has no
-  // asset address at all (only `distribution_created` does), so
-  // defaultAssetCode below is inferred from the one real distribution seen
-  // so far (XLM) - would be wrong if a future distribution uses a different
-  // asset; there is no way to attribute a specific claim to its
-  // distribution's real asset without correlating back to that
-  // distribution's own `distribution_created` event, not built here.
+  // asset address at all (only `distribution_created` does), so defaultAssetCode
+  // below is now only a FALLBACK: resolveFundableAsset (xdrParser.ts) attributes
+  // each claim to its distribution's REAL asset via a seeded + live-learned
+  // distribution_id -> asset map (built 2026-11-25, after distributions #2-#4
+  // switched XLM -> USDC and were being mis-valued as XLM; the 5 affected claims
+  // were backfilled in credit_events). The default only applies if a claim's
+  // distribution_id is missing from that map.
   CD6G3UTDV4XPDMVNYTPQ6UCL7FWSYG5LXYAZXBDDSKY5YOQ6HLDBPYRY: { protocolName: 'fundable', category: 'mass_distribution', defaultAssetCode: 'XLM' },
 
   // --- FxDAO — DELIBERATELY NOT INDEXED (re-confirmed 2026-11-22, see third-party-scoring-protocols memory).

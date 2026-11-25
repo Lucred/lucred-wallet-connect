@@ -959,6 +959,81 @@ function resolveFundableAmount(dataVal: xdr.ScVal, eventType: string): number | 
 }
 
 /**
+ * Fundable `claim` events carry NO asset (only `distribution_created` does — its
+ * data vec is [admin, asset_contract, amount, reserved], asset at index 1), so a
+ * claim's asset has to come from its distribution. Both event types carry the
+ * distribution_id as a numeric topic (see resolveFundableAmount), so we key a
+ * (contractId -> distribution_id -> asset_contract) map. It is SEEDED with every
+ * distribution_created asset known as of 2026-11-25 (so a cold start or an
+ * out-of-order backfill is correct for all existing claims) and EXTENDED live as
+ * new `distribution_created` events are parsed. Before this, every claim fell
+ * back to the registry defaultAssetCode ('XLM'), silently mis-valuing the USDC
+ * distributions (#2–#4 on CD6G3UTD…) as XLM.
+ *
+ * Residual edge case: a distribution created AFTER this deploy, then first
+ * claimed only AFTER an indexer restart (which clears the live-learned entries
+ * and does not re-read the older distribution_created), falls back to the
+ * contract default until the seed is refreshed — acceptable at current scale;
+ * the periodic re-enumeration (COVERAGE.md) refreshes the seed.
+ */
+const FUNDABLE_DISTRIBUTION_ASSETS: Record<string, Record<string, string>> = {
+  // CD6G3UTD… — asset per distribution_id, read from each distribution_created's
+  // data[1] on mainnet (verified 2026-11-25): #1 XLM, #2–#4 USDC.
+  CD6G3UTDV4XPDMVNYTPQ6UCL7FWSYG5LXYAZXBDDSKY5YOQ6HLDBPYRY: {
+    '1': 'CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA',
+    '2': 'CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75',
+    '3': 'CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75',
+    '4': 'CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75',
+  },
+};
+
+/** distribution_id is the first numeric topic on claim / distribution_created. */
+function fundableDistributionId(remainingTopics: xdr.ScVal[]): string | null {
+  const t = remainingTopics.find((v) => NUMERIC_SCVAL_TYPES.has(v.type));
+  if (!t) return null;
+  try {
+    return scValToBigInt(t).toString();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resolve the asset for a Fundable event. For `distribution_created` it LEARNS
+ * the distribution's asset (data[1]) into the seeded map and returns null (that
+ * event's own asset is already findable in its data by resolveAsset). For
+ * `claim` it returns the distribution's asset from the map, or null so the
+ * caller falls back to the registry default.
+ */
+function resolveFundableAsset(
+  contractId: string,
+  eventType: string,
+  remainingTopics: xdr.ScVal[],
+  dataVal: xdr.ScVal
+): { assetContractId?: string; assetCode?: string } | null {
+  if (eventType === 'distribution_created') {
+    const distId = fundableDistributionId(remainingTopics);
+    const assetVal = dataVal.type === 'scvVec' ? dataVal.vec?.[1] : undefined;
+    if (distId && assetVal && assetVal.type === 'scvAddress') {
+      try {
+        const assetContractId = Address.fromScVal(assetVal).toString();
+        (FUNDABLE_DISTRIBUTION_ASSETS[contractId] ??= {})[distId] = assetContractId;
+      } catch {
+        /* leave unlearned */
+      }
+    }
+    return null;
+  }
+  if (eventType !== 'claim') return null;
+  const distId = fundableDistributionId(remainingTopics);
+  if (distId === null) return null;
+  const assetContractId = FUNDABLE_DISTRIBUTION_ASSETS[contractId]?.[distId];
+  if (!assetContractId) return null;
+  const assetCode = KNOWN_ASSET_CONTRACTS[assetContractId];
+  return { assetContractId, ...(assetCode && { assetCode }) };
+}
+
+/**
  * Parses one contract's events for a single transaction, handling both event
  * shapes seen so far: normal self-contained events (one event = one action,
  * handled by parseContractEvent) and field-fragment groups (several events
@@ -1145,6 +1220,7 @@ export function parseContractEvent(
   const normalAsset = !swap && isNormal ? resolveNormalAsset(values, remainingTopics, contractId) : null;
   const defindexResult = !swap && isDeFindex ? resolveDeFindexAmountAndShares(dataVal, eventType) : null;
   const fundableAmount = !swap && isFundable ? resolveFundableAmount(dataVal, eventType) : null;
+  const fundableAsset = !swap && isFundable ? resolveFundableAsset(contractId, eventType, remainingTopics, dataVal) : null;
   const spectraAmount = !swap && isSpectra ? resolveSpectraAmount(dataVal, eventType) : null;
   const { amount, poolShareTokensAfter } = swap
     ? { amount: swap.amount, poolShareTokensAfter: undefined }
@@ -1159,7 +1235,7 @@ export function parseContractEvent(
             : spectraAmount !== null
               ? { amount: spectraAmount, poolShareTokensAfter: undefined }
               : pickAmount(values, named);
-  const { assetContractId, assetCode } = swap ?? alulaAsset ?? normalAsset ?? resolveAsset(values, protocolInfo, contractId);
+  const { assetContractId, assetCode } = swap ?? alulaAsset ?? normalAsset ?? fundableAsset ?? resolveAsset(values, protocolInfo, contractId);
 
   return {
     ledgerSequence,
