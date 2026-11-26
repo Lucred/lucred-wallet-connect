@@ -403,32 +403,15 @@ function injectSyntheticAddressTopic(event: xdr.ContractEvent, address: string):
  */
 function extractContractEvents(txMeta: xdr.TransactionMeta): xdr.ContractEvent[] {
   if (txMeta.type === 'v3') {
-    return (txMeta.v3.sorobanMeta?.events ?? []).filter(isRealContractEvent);
+    return txMeta.v3.sorobanMeta?.events ?? [];
   }
   if (txMeta.type === 'v4') {
     return (txMeta.v4.diagnosticEvents ?? [])
       .filter((diagnosticEvent) => diagnosticEvent.inSuccessfulContractCall)
-      .map((diagnosticEvent) => diagnosticEvent.event)
-      .filter(isRealContractEvent);
+      .map((diagnosticEvent) => diagnosticEvent.event);
   }
   // 'operations' | 'v1' | 'v2': pre-Soroban, structurally no ContractEvent to read.
   return [];
-}
-
-/**
- * A real application/token event, vs a host-emitted diagnostic. v4 TransactionMeta
- * (CAP-67) packs BOTH into `diagnosticEvents`: real contract events (type
- * `contract`) sit alongside the host's generic `fn_call`/`fn_return`/`log`
- * diagnostics (type `diagnostic`) and `system` events. `inSuccessfulContractCall`
- * only drops failed/argument-dump entries, NOT by kind - so without this type
- * guard the `fn_call`/`fn_return` noise (which carries the invoker address and so
- * survives parsing) was being indexed as if it were a CreditEvent, ~44% of raw
- * rows. Only `contract`-type events are things a contract actually published;
- * keep exactly those. v3's sorobanMeta.events is already contract-only, so the
- * same filter there is just a harmless invariant guard.
- */
-function isRealContractEvent(event: xdr.ContractEvent): boolean {
-  return event.type.name === 'contract';
 }
 
 /** A field-fragment event: topics are exactly [event_name, field_name], both
