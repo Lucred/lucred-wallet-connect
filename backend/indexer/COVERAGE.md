@@ -19,6 +19,7 @@ Three layers feed the score:
 | Protocol | Category | Contracts | Signal |
 |---|---|---|---|
 | **Blend** | lending_pool (+factory, +backstop) | 14 | borrow→repay (credit), supply (activity) |
+| **BLNT** | lending_pool | 3 | borrow→repay (credit) + supply/withdraw (activity) — Blend fork (blnt.trade): 2 live V3 pools + 1 dormant V1/V2 pool (2025 history); scored via the `blend` cycle branch; *added 2026-11-26* |
 | **Peridot** | lending_debt | 3 | borrow/repay |
 | **XOXNO Lending** | lending_debt | 1 | borrow/repay (RWA-collateralised) |
 | **Slender** | lending_pool | 1 | borrow/repay |

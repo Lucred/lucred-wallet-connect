@@ -29,9 +29,10 @@ function computeDebtCycles(events) {
   const relevant = events
     .filter((e) => {
       if (e.eventType !== "borrow" && e.eventType !== "repay") return false;
-      // Blend: the loan balance for cycle detection comes from the event's pool-share-tokens /
+      // Blend (and BLNT, a Blend fork with an identical event schema — see registry.ts):
+      // the loan balance for cycle detection comes from the event's pool-share-tokens /
       // collateral-ratio AFTER value.
-      if (e.protocolName === "blend") {
+      if (e.protocolName === "blend" || e.protocolName === "blnt") {
         return (e.poolShareTokensAfter !== undefined && e.poolShareTokensAfter !== null) ||
                (e.collateralRatioAfter !== undefined && e.collateralRatioAfter !== null);
       }

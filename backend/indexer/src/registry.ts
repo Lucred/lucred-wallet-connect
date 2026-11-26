@@ -105,6 +105,28 @@ export const PROTOCOL_REGISTRY: Record<string, ProtocolInfo> = {
   CC4HHXPKR3FIXUQEC53MAK2IVWD6APAEBBXP5XCIW5FISN6PQOAC6UXG: { protocolName: 'blend', category: 'lending_pool' },
   CDZVHCO7LDUJZSME3PJPJXAKT7F6W5IXSOXTJ2QEK3Y2X2CDUREBUMUY: { protocolName: 'blend', category: 'lending_pool' },
 
+  // --- BLNT (lending) — a Blend FORK on mainnet (blnt.trade), own V3 deployment — added 2026-11-26 ---
+  // "BLNT V3 is a Blend-derived lending protocol." Identical event schema to Blend
+  // (borrow / repay / supply_collateral / withdraw_collateral / flash_loan, each
+  // carrying poolShareTokensAfter — verified on real mainnet events), so the generic
+  // parser handles it unchanged and the scorer's `blend` cycle branch applies
+  // (computeDebtCycles treats 'blnt' like 'blend': cycle magnitude = poolShareTokensAfter).
+  // Kept as its own protocolName so it stays distinct from real Blend in analytics /
+  // coverage. V3 is UNAUDITED per the site — but we index activity, we don't endorse
+  // safety. Two active V3 pools (verified on mainnet, borrow+repay live through 2026-11-26):
+  //   Fixed Pool — $515k supplied / $274k borrowed; ~1.3k borrows, ~1.56k repays since 2026-10-25.
+  //   YieldBlent — multi-asset (XLM/USDC/EURC/AQUA/USTRY/CETES/PYUSD/USDT0/SolvBTC); live since 2026-11-06.
+  // V1/V2 pool CAQF5KNO…GM6S — dormant since 2026 (last borrow 2026-03) but ~780 borrow/repay events
+  // of real 2025 history worth indexing for tenure + completed cycles. Lineage checked 2026-11-26:
+  // NOT from Blend's official pool factory (CDSYOAVX emits no deploy event for it); independently
+  // deployed/administered by GA3PZ4B2… since 2025-01 and surfaced by BLNT as its V1/V2 "Blend market"
+  // → tagged 'blnt'. (WASM byte-identity vs Blend/BLNT-V3 left unresolved — SDK-plumbing issue — but
+  // it's irrelevant: the factory check settles lineage and the event schema is the same Blend shape,
+  // so it scores via the same cycle branch regardless.)
+  CACSQWCMKG45TUHCQ3LXHOB7YEEJH4W376ZHQPXH2IZ3TE4NJHFZMCY7: { protocolName: 'blnt', category: 'lending_pool' }, // V3 Fixed Pool
+  CAUTPSQDAJEUV5XEU3EXFVYRGDJLEJGVTFJCFZCSPTDCREAMZ573VF4D: { protocolName: 'blnt', category: 'lending_pool' }, // V3 YieldBlent Pool
+  CAQF5KNOFIGRI24NQRRGUPD46Q45MGMXZMRTQFXS25Y4NZVNPT34GM6S: { protocolName: 'blnt', category: 'lending_pool' }, // V1/V2 pool (dormant; ~780 borrow/repay of 2025 history)
+
   // --- Aquarius (AMM) — #2 by TVL (~$38m) — RESOLVED via live discovery, corrected 2026-09-29 ---
   // https://docs.aqua.network/developers/code-examples/prerequisites-and-basics
   // WAS WRONG below until 2026-09-29: this was assumed to be one shared AMM
