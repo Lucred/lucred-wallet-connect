@@ -403,15 +403,34 @@ function injectSyntheticAddressTopic(event: xdr.ContractEvent, address: string):
  */
 function extractContractEvents(txMeta: xdr.TransactionMeta): xdr.ContractEvent[] {
   if (txMeta.type === 'v3') {
-    return txMeta.v3.sorobanMeta?.events ?? [];
+    return (txMeta.v3.sorobanMeta?.events ?? []).filter(isRealContractEvent);
   }
   if (txMeta.type === 'v4') {
     return (txMeta.v4.diagnosticEvents ?? [])
       .filter((diagnosticEvent) => diagnosticEvent.inSuccessfulContractCall)
-      .map((diagnosticEvent) => diagnosticEvent.event);
+      .map((diagnosticEvent) => diagnosticEvent.event)
+      .filter(isRealContractEvent);
   }
   // 'operations' | 'v1' | 'v2': pre-Soroban, structurally no ContractEvent to read.
   return [];
+}
+
+/**
+ * A real application/token event, vs a host-emitted diagnostic. v4 TransactionMeta
+ * (CAP-67) packs BOTH into `diagnosticEvents`: real contract events (type
+ * `contract`) sit alongside the host's generic `fn_call`/`fn_return`/`log`
+ * diagnostics (type `diagnostic`) and `system` events. `inSuccessfulContractCall`
+ * only drops failed/argument-dump entries, NOT by kind - so without this type
+ * guard the `fn_call`/`fn_return` noise (which carries the invoker address and so
+ * survives parsing) was indexed as if it were a CreditEvent (~44% of all rows,
+ * confirmed: fn_call/fn_return are ContractEventTypeDiagnostic in Hubble, real
+ * swap/borrow/supply events are ContractEventTypeContract). Only `contract`-type
+ * events are things a contract actually published; keep exactly those. v3's
+ * sorobanMeta.events is already contract-only, so the same filter there is just a
+ * harmless invariant guard.
+ */
+function isRealContractEvent(event: xdr.ContractEvent): boolean {
+  return event.type.name === 'contract';
 }
 
 /** A field-fragment event: topics are exactly [event_name, field_name], both
@@ -1178,7 +1197,19 @@ export function parseContractEvent(
   // ContractEvent.body is a v0-only union today: { topics: ScVal[], data: ScVal }.
   const eventBody = event.body.v0;
   const topics = eventBody.topics;
-  if (topics.length < 2) return null;
+  // A real event needs at least the event-name topic. Do NOT require >= 2:
+  // confirmed on real mainnet data that some protocols emit a SINGLE-topic
+  // event whose user address and amount live entirely in the data payload -
+  // e.g. Sushi's `swap` is topics=[swap], data={sender, recipient, amount0,
+  // amount1, ...}. The old `< 2` guard dropped every one of those (~139k real
+  // Sushi user swaps/mints/collects) before resolution ran. The two gates that
+  // actually matter still apply below: the event-name must be a symbol
+  // (eventTypeIndex check) and a real user account must be found
+  // (findAccountAddresses null-check) - verified on real data that the
+  // single-topic events WITHOUT a user (Aquarius update_reserves/pool_state,
+  // Blend/Huma admin/emission events) carry no account address and so are still
+  // dropped there, exactly as before.
+  if (topics.length < 1) return null;
 
   // The event name is usually topics[0], but not always: real Soroswap
   // Router `swap` events lead with a plain scvString contract-name label
