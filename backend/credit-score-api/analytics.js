@@ -70,7 +70,8 @@ function createAnalytics(bq) {
     try {
       const [kpiRows, byProtocol, byCategory, topAssets, eventsPerDay, walletsByMonth] = await Promise.all([
         q(`SELECT COUNT(*) totalEvents, COUNT(DISTINCT userAddress) totalWallets,
-             COUNT(DISTINCT protocolName) totalProtocols, MAX(ledgerSequence) maxLedger,
+             COUNT(DISTINCT protocolName) totalProtocols, COUNT(DISTINCT contractId) totalContracts,
+             MAX(ledgerSequence) maxLedger,
              MIN(blockCloseTime) firstEvent, MAX(blockCloseTime) lastEvent,
              COUNTIF(blockCloseTime >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR)) events24h,
              COUNTIF(blockCloseTime >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 7 DAY)) events7d
@@ -160,6 +161,7 @@ function createAnalytics(bq) {
           totalEvents: num(k.totalEvents),
           totalWallets: num(k.totalWallets),
           totalProtocols: num(k.totalProtocols),
+          totalContracts: num(k.totalContracts),
           maxLedger: num(k.maxLedger),
           firstEvent: str(k.firstEvent),
           lastEvent: str(k.lastEvent),

@@ -5,7 +5,7 @@ import "./analytics"; // Vercel Web Analytics (page views)
 const API_URL = import.meta.env.VITE_CREDIT_SCORE_API_URL as string | undefined;
 
 type Kpis = {
-  totalEvents: number; totalWallets: number; totalProtocols: number; maxLedger: number;
+  totalEvents: number; totalWallets: number; totalProtocols: number; totalContracts: number; maxLedger: number;
   firstEvent: string; lastEvent: string; events24h: number; events7d: number;
 };
 type Analytics = {
@@ -42,7 +42,11 @@ function renderKpis(k: Kpis, p: Analytics["product"]) {
   const tiles = [
     tile("Credit events indexed", compact.format(k.totalEvents), full.format(k.totalEvents) + " on-chain events", true),
     tile("Wallets scored", compact.format(k.totalWallets)),
-    tile("Protocols covered", String(k.totalProtocols)),
+    tile("Protocols active", String(k.totalProtocols)),
+    // Distinct on-chain contracts across all covered protocols (a protocol spans many pools/markets),
+    // so this is always >= protocols. Guarded: older API builds omit the field, so skip rather than
+    // render "NaN" until the API redeploys with totalContracts.
+    ...(k.totalContracts ? [tile("Contracts indexed", compact.format(k.totalContracts), full.format(k.totalContracts) + " on-chain contracts")] : []),
     tile("Events · last 24h", compact.format(k.events24h)),
     tile("Events · last 7d", compact.format(k.events7d)),
     tile("Max ledger indexed", compact.format(k.maxLedger)),
