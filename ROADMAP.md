@@ -197,6 +197,35 @@ API is a candidate data source/partner.
       skim RPC v30 / Horizon v30 release notes; W-addresses (SEP-23 muxed contract addresses,
       CAP-84) — switch user-facing params to `MuxedAddress` to accept both (needs rebuild+upgrade);
       migrate to `SOROBAN_CREDENTIALS_ADDRESS_V2` at convenience.
+- [x] **[done 2026-11-27] Indexer diagnostic-event leak fixed + Sushi recovered.** Protocol 23 /
+      CAP-67 v4 TransactionMeta packs host diagnostics (`fn_call`/`fn_return`) into the same
+      `diagnosticEvents` list as real contract events; the parser wasn't filtering them, so they
+      landed in `credit_bureau.credit_events` as fake credit events with userAddress set. A separate
+      `topics.length < 2` guard silently dropped all single-topic events — which zeroed every Sushi
+      swap (swap topic = `[swap]`). Fix: `isRealContractEvent` filter on both v3/v4 branches + guard
+      relaxed to `< 1` (parser image `6b1aa1b4d781`). Sushi auto-discovery also fixed — stellar.expert's
+      events API started returning HTTP 402 and silently zeroed Sushi capture, so an 82-pool static
+      baseline (`SUSHI_KNOWN_POOLS`, from factory pool_created history) now seeds discovery (image
+      `beebdd4def93`). Live seam: ledger 65689696 / 2026-11-26 23:09 UTC. Sushi backfilled (139,137
+      events, 25,804 wallets, pre-seam) and its 224,701 leaked `fn_call` rows purged. Sushi now
+      139,276 real events / 0 diagnostic.
+- [ ] **[planned] Full cross-protocol `fn_call`/`fn_return` purge.** ~5.67M leaked diagnostic rows
+      remain across all protocols (Sushi's 224,701 already purged). Leak is stopped live, so this is
+      cleanup-at-leisure: `DELETE ... WHERE eventType IN ('fn_call','fn_return')` scoped per protocol,
+      recoverable 7 days via BQ time-travel. **Verified safe 2026-11-27** — a reparse investigation
+      (re-pulled raw XDR from Hubble, tallied topic-length, re-ran the fixed parser) confirmed no
+      recoverable user credit activity hides in the remaining `fn_call` population: Sushi was the only
+      true data loss (single-topic swaps, now backfilled); blend's `supply`/`withdraw`/`repay` and
+      phoenix's router-attributed swaps are correctly dropped as non-end-user (aggregator/router), and
+      xoxno/huma/templar emit only non-user state/housekeeping events. So this purge is pure cleanup,
+      not a risk of destroying recoverable data.
+- [ ] **[planned] Coverage-hole re-backfill (blend/soroswap/spiko).** Multi-topic "gaps" seen in
+      Aug–Sep 2025 and Feb–Mar 2026 are historical ledger-coverage holes, not parser bugs — re-run the
+      Hubble→parser→`bq load` backfill over those ranges (same method as the Sushi backfill).
+- [ ] **[planned] stellar.expert → Soroban RPC `getEvents` discovery upgrade.** The Sushi 82-pool
+      baseline is static as of 2026-11-26; pools created after that won't be indexed until the baseline
+      is refreshed. Replace the dead stellar.expert events dependency with RPC `getEvents` on the
+      factory's pool_created topic so new pools auto-register (as Soroswap/DeFindex/Aquarius already do).
 - [ ] **[planned] Home-page pool metrics fix.** Pool APY/liquidity/markets show "—" (empty testnet
       pool + a catch in `src/home.ts` that dashes markets on read failure) → harden the UI and seed
       the pool. (From partner feedback.)

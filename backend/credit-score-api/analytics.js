@@ -126,7 +126,9 @@ function createAnalytics(bq) {
       const scoreTiers = await qSafe("SELECT tier, count FROM `credit_bureau.credit_score_tiers` ORDER BY tier", []);
 
       // Per-protocol daily series for the top protocols (powers the time-series filter).
-      const topNames = byProtocol.slice(0, 6).map((r) => r.name);
+      // Uses the full top-12 set that byProtocol already fetched, so the filter chips line up
+      // with the "by protocol" breakdown card instead of stopping at an arbitrary 6.
+      const topNames = byProtocol.slice(0, 12).map((r) => r.name);
       let eventsPerDayByProtocol = [];
       if (topNames.length) {
         const [rows] = await bq.query({
